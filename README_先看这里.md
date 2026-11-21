@@ -20,6 +20,10 @@
 - Spellgems 任务线介绍 Mana Root、Mana Essence、Mana Infuser 的实际玩法；对未核实的 Spellgems 注册 ID 不用猜测值。
 - Global Packs 自动加载配置、JustQuests 配置、Modrinth API 本地构建脚本与 PCL 部署说明。
 
+## GitHub 版本发布
+
+[打开 V0.2.0-alpha.3 GitHub 预发布页面](https://github.com/KevinWang137137/aeon-ark-lost-frontier/releases/tag/v0.2.0-alpha.3)。该版本提供源码 ZIP，不包含第三方模组 JAR，也不是已实测可直接游玩的整合包。
+
 ## 当前工程的边界（请务必看）
 这不是已通过客户端验收的稳定发行版。当前压缩包**不包含第三方模组 JAR**，原因是制作环境无法直接连接 Modrinth 下载文件，也不能启动 Minecraft 客户端。工程内的 Windows 构建脚本会在你的电脑联网后下载 26.3 Fabric 兼容模组、解析必需依赖并校验 SHA-512/SHA-1，再生成包含真实 JAR 的完整文件包。
 

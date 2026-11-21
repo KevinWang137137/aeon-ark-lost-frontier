@@ -32,9 +32,9 @@ Design priorities:
 
 ## Download the source snapshot
 
-The source ZIP for this milestone is shared separately with the project owner. It is not published as a GitHub Release asset yet.
+[Open the v0.2.0-alpha.3 GitHub pre-release](https://github.com/KevinWang137137/aeon-ark-lost-frontier/releases/tag/v0.2.0-alpha.3) and download **AeonArk-0.2.0-alpha.3-Source.zip**.
 
-The bundle contains the authored quest datapack, configuration, mod source list, Windows PowerShell build script, quest validator, and project notes. It **does not contain third-party mod JARs**. The build script resolves compatible files from Modrinth on a Windows machine and validates downloaded hashes.
+The bundle contains the authored quest data bundle, configuration, mod source list, Windows PowerShell build script, quest validator, and project notes. It **does not contain third-party mod JARs**. The build script resolves compatible files from Modrinth on a Windows machine and validates downloaded hashes. This is a source-only engineering preview, not a prebuilt playable pack.
 
 ## Local validation
 
