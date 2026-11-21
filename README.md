@@ -32,7 +32,7 @@ Design priorities:
 
 ## Download the source snapshot
 
-[Download the v0.2.0-alpha.3 source archive](artifacts/AeonArk-v0.2.0-alpha.3-Source.tar.xz)
+The source ZIP for this milestone is shared separately with the project owner. It is not published as a GitHub Release asset yet.
 
 The bundle contains the authored quest datapack, configuration, mod source list, Windows PowerShell build script, quest validator, and project notes. It **does not contain third-party mod JARs**. The build script resolves compatible files from Modrinth on a Windows machine and validates downloaded hashes.
 
@@ -64,4 +64,4 @@ See [`docs/技术核验记录.md`](docs/技术核验记录.md), [`docs/V0.2.0-al
 
 本次源代码包有 72 条原创任务、8 个任务分类、任务前置链、模组清单、PCL 本地构建脚本与静态校验脚本。目标为 Minecraft Java 26.3 + Fabric + Java 25，Dreamcraft 式特殊小岛开局、标准生存难度。
 
-请先下载上方 source bundle，解压后按 `README_先看这里.md` 操作。第三方模组 JAR 不随仓库重打包；Windows 构建脚本会从 Modrinth 官方项目记录下载并校验文件。启动、岛屿生成、任务实测和性能测试尚未完成。
+本次会话附带的 source ZIP 解压后，请按 `README_先看这里.md` 操作。第三方模组 JAR 不随仓库重打包；Windows 构建脚本会从 Modrinth 官方项目记录下载并校验文件。启动、岛屿生成、任务实测和性能测试尚未完成。
