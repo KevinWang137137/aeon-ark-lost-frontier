@@ -32,8 +32,8 @@ jobs:
         run: |
           set -euo pipefail
           VERSION="$(tr -d '[:space:]' < .github/release-version.txt)"
-          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]+$ ]]; then
-            echo "Invalid alpha version: $VERSION" >&2
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid semantic version: $VERSION" >&2
             exit 1
           fi
 
@@ -58,7 +58,7 @@ jobs:
 
           ## Important limitations
           - This asset is source code and authored game data, **not a prebuilt playable modpack**.
-          - Third-party mod JARs are not included. Run `Build_PCL整合包.bat` on an internet-connected Windows PC to resolve and verify compatible files.
+          - Third-party mod JARs are not included. Run the Windows batch file named Build_PCL整合包.bat on an internet-connected Windows PC to resolve and verify compatible files.
           - Windows PowerShell build execution, PCL import, Minecraft client launch, island spawn, in-game quest tracking, and 5 GB performance tests have not yet been completed.
           - The island seed is a candidate and is not claimed to have been verified.
 
@@ -68,14 +68,15 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "archive=$ARCHIVE" >> "$GITHUB_OUTPUT"
 
-      - name: Publish GitHub pre-release
+      - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.release.outputs.version }}
           target_commitish: ${{ github.sha }}
           name: Aeon Ark v${{ steps.release.outputs.version }} — Source Preview
-          prerelease: true
+          prerelease: ${{ contains(steps.release.outputs.version, '-') }}
           draft: false
+          overwrite_files: true
           files: ${{ steps.release.outputs.archive }}
           body_path: dist/release-notes.md
         env:
