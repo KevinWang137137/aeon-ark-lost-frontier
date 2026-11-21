@@ -1,4 +1,4 @@
-name: Publish source-only preview release
+name: Publish source and Windows launcher preview
 
 on:
   push:
@@ -12,21 +12,18 @@ permissions:
   contents: write
 
 jobs:
-  publish-source-preview:
+  publish-preview:
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
         uses: actions/checkout@v4
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
       - name: Validate quest data
         run: python scripts/validate_quests.py
-
-      - name: Prepare source archive and release notes
+      - name: Prepare release archives and notes
         id: release
         shell: bash
         run: |
@@ -36,48 +33,47 @@ jobs:
             echo "Invalid semantic version: $VERSION" >&2
             exit 1
           fi
-
           mkdir -p dist
-          ARCHIVE="dist/AeonArk-${VERSION}-Source.zip"
-          git archive --format=zip --prefix="aeon-ark-lost-frontier-${VERSION}/" HEAD -o "$ARCHIVE"
-
+          SOURCE="dist/AeonArk-\${VERSION}-Source.zip"
+          LAUNCHER="dist/AeonArk-\${VERSION}-Windows-Launcher.zip"
+          git archive --format=zip --prefix="aeon-ark-lost-frontier-\${VERSION}/" HEAD -o "$SOURCE"
+          git archive --format=zip --prefix="aeon-ark-windows-launcher-\${VERSION}/" HEAD launcher scripts config global_packs quest-data modpack_sources.json pack_manifest.json Build_PCL整合包.bat README_先看这里.md -o "$LAUNCHER"
           cat > dist/release-notes.md <<EOF
-          # Aeon Ark: The Lost Frontier v${VERSION}
+          # Aeon Ark: The Lost Frontier v\${VERSION}
 
-          **Source-only engineering preview** for Minecraft Java 26.3 + Fabric.
+          **Windows launcher + source engineering preview** for Minecraft Java 26.3 + Fabric.
 
-          ## Included
-          - 72 original Chinese quest definitions in 8 categories (stored as a compact source bundle).
-          - PCL-oriented Windows build scripts and Modrinth dependency/hash resolution.
-          - Instance-scoped Global Packs and JustQuests configuration.
-          - Optional Terralith world-generation datapack; it is not enabled by default so the island start can be tested separately.
+          ## Release assets
+          - **Windows-Launcher.zip** — portable PowerShell GUI launcher. Extract the ZIP, open the launcher folder, and double-click Start-AeonArk.bat.
+          - **Source.zip** — full editable project source and quest data.
 
-          ## Validation
-          - Quest JSON, objective/reward fields and prerequisite references pass the repository validator.
-          - GitHub Actions must complete the validation job successfully before this Release is created.
+          ## Launcher features
+          - One-click build/download of compatible Modrinth files with hash verification.
+          - Guided installation of mods, config and Global Packs into an existing Fabric 26.3 instance.
+          - Open PCL/PCL2, with manual executable selection if auto-detection fails.
+          - Does not modify or delete worlds/saves.
 
-          ## Important limitations
-          - This asset is source code and authored game data, **not a prebuilt playable modpack**.
-          - Third-party mod JARs are not included. Run the Windows batch file named Build_PCL整合包.bat on an internet-connected Windows PC to resolve and verify compatible files.
-          - Windows PowerShell build execution, PCL import, Minecraft client launch, island spawn, in-game quest tracking, and 5 GB performance tests have not yet been completed.
-          - The island seed is a candidate and is not claimed to have been verified.
-
-          Use Java 25 x64 and test in a fresh PCL instance. Do not use this alpha build as the only copy of an existing world.
+          ## Requirements and limitations
+          - Windows 10/11, PowerShell 5.1, internet for first build, Java 25 x64, and an already-installed Minecraft 26.3 + Fabric 0.20.1 instance.
+          - The launcher does not yet install Minecraft/Fabric or automatically start the game instance.
+          - This remains an engineering preview, not a client-tested ready-to-play release. Island spawn, quest tracking and 5 GB performance still require in-game validation.
+          - Back up existing worlds before testing. Use a fresh instance and a new world.
           EOF
-
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "archive=$ARCHIVE" >> "$GITHUB_OUTPUT"
-
+          echo "source=$SOURCE" >> "$GITHUB_OUTPUT"
+          echo "launcher=$LAUNCHER" >> "$GITHUB_OUTPUT"
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.release.outputs.version }}
-          target_commitish: ${{ github.sha }}
-          name: Aeon Ark v${{ steps.release.outputs.version }} — Source Preview
-          prerelease: ${{ contains(steps.release.outputs.version, '-') }}
+          tag_name: v\${{ steps.release.outputs.version }}
+          target_commitish: \${{ github.sha }}
+          name: Aeon Ark v\${{ steps.release.outputs.version }} — Launcher Preview
+          prerelease: \${{ contains(steps.release.outputs.version, '-') }}
           draft: false
           overwrite_files: true
-          files: ${{ steps.release.outputs.archive }}
+          files: |
+            \${{ steps.release.outputs.source }}
+            \${{ steps.release.outputs.launcher }}
           body_path: dist/release-notes.md
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
