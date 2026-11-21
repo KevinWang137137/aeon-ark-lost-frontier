@@ -1,0 +1,19 @@
+{
+  "game": "Minecraft Java 26.3",
+  "loader": "Fabric",
+  "quest_count": 72,
+  "category_count": 8,
+  "categories": {
+    "01_潮汐初醒": 9,
+    "02_越海而行": 9,
+    "03_自然与生命": 9,
+    "04_田园与料理": 9,
+    "05_机械与工坊": 9,
+    "06_秘法与符文": 9,
+    "07_文明档案": 9,
+    "08_方舟终章": 9
+  },
+  "missing_prerequisites": [],
+  "static_errors": [],
+  "client_launch_test": "NOT RUN"
+}

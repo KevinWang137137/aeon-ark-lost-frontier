@@ -1,0 +1,37 @@
+{
+  "minecraft": "26.3",
+  "loader": "fabric",
+  "loader_version": "0.20.1",
+  "java": 25,
+  "required_mods": [
+    {"project": "fabric-api", "purpose": "Fabric基础API"},
+    {"project": "justquests", "purpose": "章节任务、目标、奖励和前置"},
+    {"project": "globalpacks", "purpose": "实例内任务数据包自动加载"},
+    {"project": "biomes-o-plenty", "purpose": "新增群系与植物"},
+    {"project": "farmers-delight-refabricated", "purpose": "农业、料理与食物成长"},
+    {"project": "ala-industrial", "purpose": "机器、能源与矿物处理"},
+    {"project": "LiazpLjr", "purpose": "Spellgems魔法宝石与法杖"},
+    {"project": "nemos-creatures", "purpose": "新增生物"},
+    {"project": "repurposed-structures-fabric", "purpose": "原版风格结构变体"},
+    {"project": "jei", "purpose": "物品和配方查询"}
+  ],
+  "optional_mods": [
+    {"project": "living-things", "purpose": "野生动物（需再次检查依赖）"},
+    {"project": "assorted-structures", "purpose": "探索结构"},
+    {"project": "assorted-building-blocks", "purpose": "建筑方块"},
+    {"project": "sodium", "purpose": "渲染性能"},
+    {"project": "lithium", "purpose": "逻辑性能"},
+    {"project": "ferrite-core", "purpose": "内存优化"},
+    {"project": "entityculling", "purpose": "实体剔除"},
+    {"project": "immediatelyfast", "purpose": "界面与渲染优化"},
+    {"project": "modmenu", "purpose": "模组配置入口"},
+    {"project": "xaeros-minimap", "purpose": "小地图"},
+    {"project": "xaeros-world-map", "purpose": "世界地图"},
+    {"project": "appleskin", "purpose": "食物信息"},
+    {"project": "mouse-tweaks", "purpose": "背包操作"},
+    {"project": "cloth-config", "purpose": "按依赖自动解析"}
+  ],
+  "datapack_projects": [
+    {"project": "Dungeons-and-Taverns", "filename": "dungeons_and_taverns.zip", "required": false}
+  ]
+}
