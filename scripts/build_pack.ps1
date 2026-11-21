@@ -86,7 +86,12 @@ function Add-Datapack([string]$Project,[string]$Filename,[string]$Directory,[boo
         $Version = Get-Version $Project @('datapack')
         if ($null -eq $Version) { throw "找不到 Minecraft $Game 数据包版本" }
         $File = Get-File $Version '.zip'
-        Download-Verified $File (Join-Path $Overrides "global_packs/$Directory/$Filename")
+        # Store the verified datapack in source so both MRPACK and PCL ZIP include it.
+        $Destination = Join-Path $Root "global_packs/$Directory/$Filename"
+        Download-Verified $File $Destination
+        $StageDestination = Join-Path $Overrides "global_packs/$Directory/$Filename"
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $StageDestination) | Out-Null
+        Copy-Item $Destination $StageDestination -Force
         Write-Host "[DATAPACK] $Project -> $($Version.version_number)" -ForegroundColor Green
     } catch {
         if ($Required) { throw "必需数据包 $Project 失败：$($_.Exception.Message)" }

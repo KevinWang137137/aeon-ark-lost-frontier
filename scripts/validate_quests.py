@@ -90,6 +90,10 @@ def main() -> int:
             if needed is None: errors.append(f"{qid}: unknown reward {kind}")
             elif needed - reward.keys(): errors.append(f"{qid}: {kind} missing {sorted(needed - reward.keys())}")
         entries.append((qid, quest))
+    if len(entries) != 72:
+        errors.append(f"expected 72 authored quests in this alpha snapshot, found {len(entries)}")
+    if len(categories) != 8:
+        errors.append(f"expected 8 quest categories in this alpha snapshot, found {len(categories)}")
     for qid, quest in entries:
         for prereq in quest.get("requires", []):
             if prereq not in quest_ids: errors.append(f"{qid}: missing prerequisite {prereq}")
