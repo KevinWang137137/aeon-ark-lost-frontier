@@ -1,0 +1,22 @@
+name: Validate quest data
+on:
+  push:
+    paths:
+      - "quest-data/**"
+      - "scripts/validate_quests.py"
+      - "global_packs/**"
+  pull_request:
+    paths:
+      - "quest-data/**"
+      - "scripts/validate_quests.py"
+      - "global_packs/**"
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate 72 quest files
+        run: python scripts/validate_quests.py

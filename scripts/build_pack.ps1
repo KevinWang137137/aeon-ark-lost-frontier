@@ -1,0 +1,143 @@
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+$Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
+$Api = 'https://api.modrinth.com/v2'
+$Game = '26.3'
+$Loader = 'fabric'
+$LoaderVersion = '0.20.1'
+$PackVersion = '0.2.0-alpha.3'
+$Out = Join-Path $Root 'release'
+$Stage = Join-Path $Root '.build_mrpack'
+$Overrides = Join-Path $Stage 'overrides'
+$Local = Join-Path $Root '.build_full_zip'
+$LocalMods = Join-Path $Local 'mods'
+$IndexFiles = New-Object System.Collections.Generic.List[object]
+$Resolved = @{}
+$MetaCache = @{}
+$Warnings = New-Object System.Collections.Generic.List[string]
+$Utf8 = New-Object System.Text.UTF8Encoding($false)
+
+function Get-Meta([string]$Project) {
+    if ($MetaCache.ContainsKey($Project)) { return $MetaCache[$Project] }
+    $Meta = Invoke-RestMethod "$Api/project/$Project" -TimeoutSec 45
+    $MetaCache[$Project] = $Meta
+    return $Meta
+}
+function Get-Version([string]$Project,[string[]]$Platforms) {
+    $Games = [uri]::EscapeDataString('["' + $Game + '"]')
+    $Loaders = [uri]::EscapeDataString('["' + ($Platforms -join '","') + '"]')
+    $Versions = @(Invoke-RestMethod "$Api/project/$Project/version?game_versions=$Games&loaders=$Loaders" -TimeoutSec 45)
+    if ($Versions.Count -eq 0) { return $null }
+    return ($Versions | Sort-Object @{Expression={switch ($_.version_type) {'release'{0} 'beta'{1} 'alpha'{2} default{3}}}},@{Expression={$_.date_published};Descending=$true} | Select-Object -First 1)
+}
+function Get-File($Version,[string]$Extension) {
+    $File = $Version.files | Where-Object { $_.primary -eq $true -and $_.filename.ToLower().EndsWith($Extension) } | Select-Object -First 1
+    if ($null -eq $File) { $File = $Version.files | Where-Object { $_.filename.ToLower().EndsWith($Extension) } | Select-Object -First 1 }
+    if ($null -eq $File) { throw "版本 $($Version.version_number) 没有 $Extension 文件" }
+    return $File
+}
+function Download-Verified($File,[string]$Path) {
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $Path) | Out-Null
+    Invoke-WebRequest -Uri $File.url -OutFile $Path -TimeoutSec 180
+    if ($File.hashes.sha512) {
+        $Hash = (Get-FileHash $Path -Algorithm SHA512).Hash.ToLower()
+        if ($Hash -ne $File.hashes.sha512.ToLower()) { throw "SHA-512 校验失败：$($File.filename)" }
+    } elseif ($File.hashes.sha1) {
+        $Hash = (Get-FileHash $Path -Algorithm SHA1).Hash.ToLower()
+        if ($Hash -ne $File.hashes.sha1.ToLower()) { throw "SHA-1 校验失败：$($File.filename)" }
+    } else { throw "Modrinth 未提供哈希：$($File.filename)" }
+}
+function Add-Version($Meta,$Version) {
+    if ($Resolved.ContainsKey($Meta.id)) { return }
+    if (-not ($Version.game_versions -contains $Game) -or -not ($Version.loaders -contains $Loader)) { throw "$($Meta.title) 的依赖版本不支持 $Game / $Loader" }
+    $File = Get-File $Version '.jar'
+    if (Test-Path (Join-Path $LocalMods $File.filename)) { throw "不同项目出现同名 JAR：$($File.filename)" }
+    Download-Verified $File (Join-Path $LocalMods $File.filename)
+    $Client = if ($Meta.client_side) { $Meta.client_side } else { 'required' }
+    $Server = if ($Meta.server_side) { $Meta.server_side } else { 'required' }
+    $IndexFiles.Add([ordered]@{path="mods/$($File.filename)";hashes=$File.hashes;env=@{client=$Client;server=$Server};downloads=@($File.url);fileSize=[long]$File.size})
+    $Resolved[$Meta.id] = @{name=$Meta.title;version=$Version.version_number;filename=$File.filename;version_id=$Version.id}
+    Write-Host "[MOD] $($Meta.title) -> $($Version.version_number)" -ForegroundColor Green
+    foreach ($Dep in @($Version.dependencies)) {
+        if ($Dep.dependency_type -ne 'required') { continue }
+        if ($Dep.version_id) {
+            $Exact = Invoke-RestMethod "$Api/version/$($Dep.version_id)" -TimeoutSec 45
+            $DepMeta = Get-Meta ([string]$Exact.project_id)
+            Add-Version $DepMeta $Exact
+        } elseif ($Dep.project_id) { Add-Project ([string]$Dep.project_id) $true }
+    }
+}
+function Add-Project([string]$Project,[bool]$Required) {
+    try {
+        $Meta = Get-Meta $Project
+        if ($Resolved.ContainsKey($Meta.id)) { return }
+        $Version = Get-Version $Meta.id @($Loader)
+        if ($null -eq $Version) { throw "没有 $Game / $Loader 发布文件" }
+        Add-Version $Meta $Version
+    } catch {
+        if ($Required) { throw "必需模组/依赖 $Project 失败：$($_.Exception.Message)" }
+        $Warnings.Add("可选模组 $Project 跳过：$($_.Exception.Message)")
+        Write-Warning "可选模组 $Project 跳过：$($_.Exception.Message)"
+    }
+}
+function Add-Datapack([string]$Project,[string]$Filename,[string]$Directory,[bool]$Required) {
+    try {
+        if ($Directory -notin @('required_data','optional_data')) { throw "非法数据包目录：$Directory" }
+        $Version = Get-Version $Project @('datapack')
+        if ($null -eq $Version) { throw "找不到 Minecraft $Game 数据包版本" }
+        $File = Get-File $Version '.zip'
+        Download-Verified $File (Join-Path $Overrides "global_packs/$Directory/$Filename")
+        Write-Host "[DATAPACK] $Project -> $($Version.version_number)" -ForegroundColor Green
+    } catch {
+        if ($Required) { throw "必需数据包 $Project 失败：$($_.Exception.Message)" }
+        $Warnings.Add("可选数据包 $Project 跳过：$($_.Exception.Message)")
+        Write-Warning "可选数据包 $Project 跳过：$($_.Exception.Message)"
+    }
+}
+
+try {
+    Write-Host "=== 方舟纪元：失落的世界 | Minecraft $Game / Fabric ===" -ForegroundColor Cyan
+    & (Join-Path $Root 'scripts/expand_quest_bundle.ps1')
+    if (Test-Path $Stage) { Remove-Item $Stage -Recurse -Force }
+    if (Test-Path $Local) { Remove-Item $Local -Recurse -Force }
+    New-Item -ItemType Directory -Force -Path $Overrides,$LocalMods,$Out | Out-Null
+    Copy-Item (Join-Path $Root 'config') (Join-Path $Overrides 'config') -Recurse -Force
+    Copy-Item (Join-Path $Root 'global_packs') (Join-Path $Overrides 'global_packs') -Recurse -Force
+    $Manifest = Get-Content (Join-Path $Root 'modpack_sources.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+    foreach ($Mod in $Manifest.required_mods) { Add-Project ([string]$Mod.project) $true }
+    foreach ($Mod in $Manifest.optional_mods) { Add-Project ([string]$Mod.project) $false }
+    foreach ($Pack in $Manifest.datapack_projects) {
+        $Dir = if ($Pack.directory) { [string]$Pack.directory } else { 'optional_data' }
+        $Required = if ($null -ne $Pack.required) { [bool]$Pack.required } else { $false }
+        Add-Datapack ([string]$Pack.project) ([string]$Pack.filename) $Dir $Required
+    }
+    $Index = [ordered]@{formatVersion=1;game='minecraft';versionId=$PackVersion;name='方舟纪元：失落的世界';summary='Minecraft 26.3 Fabric · 标准生存 · 小岛开局 · 中文任务冒险';files=@($IndexFiles);dependencies=@{minecraft=$Game;'fabric-loader'=$LoaderVersion}}
+    [IO.File]::WriteAllText((Join-Path $Stage 'modrinth.index.json'),($Index | ConvertTo-Json -Depth 30),$Utf8)
+    Copy-Item (Join-Path $Root 'config') (Join-Path $Local 'config') -Recurse -Force
+    Copy-Item (Join-Path $Root 'global_packs') (Join-Path $Local 'global_packs') -Recurse -Force
+    Copy-Item (Join-Path $Root 'README_先看这里.md') $Local -Force
+    Copy-Item (Join-Path $Root 'pack_manifest.json') $Local -Force
+    $Report = [ordered]@{minecraft=$Game;loader=$Loader;loader_version=$LoaderVersion;resolved=$Resolved;warnings=@($Warnings)}
+    [IO.File]::WriteAllText((Join-Path $Local 'mod-resolution-report.json'),($Report | ConvertTo-Json -Depth 30),$Utf8)
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $FullZip = Join-Path $Out "AeonArk-26.3-Fabric-v$PackVersion-FullFiles.zip"
+    $Mrpack = Join-Path $Out "AeonArk-26.3-Fabric-v$PackVersion.mrpack"
+    foreach ($Path in @($FullZip,$Mrpack)) { if (Test-Path $Path) { Remove-Item $Path -Force } }
+    [IO.Compression.ZipFile]::CreateFromDirectory($Local,$FullZip,[IO.Compression.CompressionLevel]::Optimal,$false)
+    $Check = [IO.Compression.ZipFile]::OpenRead($FullZip)
+    try {
+        $Jars = @($Check.Entries | Where-Object {$_.FullName -match '^mods/.+\.jar$'}).Count
+        if ($Jars -eq 0) { throw '完整文件 ZIP 中没有 mods/*.jar' }
+        Write-Host "完整文件 ZIP JAR 数：$Jars" -ForegroundColor Green
+    } finally { $Check.Dispose() }
+    [IO.Compression.ZipFile]::CreateFromDirectory($Stage,$Mrpack,[IO.Compression.CompressionLevel]::Optimal,$false)
+    Write-Host "构建完成：$FullZip" -ForegroundColor Green
+    Write-Host "构建完成：$Mrpack" -ForegroundColor Green
+    Write-Host "必需与自动依赖模组：$($IndexFiles.Count)；可选跳过：$($Warnings.Count)" -ForegroundColor Green
+    Write-Host '请在 PCL 使用 Java 25 x64；用新世界测试小岛出生，不要覆盖旧存档。' -ForegroundColor Yellow
+} catch {
+    Write-Host "构建失败：$($_.Exception.Message)" -ForegroundColor Red
+    exit 1
+} finally {
+    if (Test-Path $Stage) { Remove-Item $Stage -Recurse -Force }
+}

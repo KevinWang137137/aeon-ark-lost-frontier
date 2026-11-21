@@ -1,0 +1,9 @@
+.build_mrpack/
+.build_full_zip/
+release/
+mods/
+logs/
+crash-reports/
+saves/
+*.mrpack
+.questdata_unpack/

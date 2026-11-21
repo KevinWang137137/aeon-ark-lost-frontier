@@ -1,0 +1,13 @@
+# Global Packs：仅启用本实例内的数据包，不加载用户级公共包
+enable_system_global_packs = false
+config_version = 4
+log_pack_ids = false
+
+[resourcepacks]
+required = ["resourcepacks/", "global_packs/required_resources/"]
+enable_builtin = []
+
+[datapacks]
+required = ["datapacks/", "global_packs/required_data/"]
+optional = ["global_packs/optional_data/"]
+enable_builtin = []
