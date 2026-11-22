@@ -23,7 +23,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r launcher_app/requirements.txt
-      - name: Prepare launcher icon
+      - name: Prepare launcher icon assets
         run: |
           python -c "import base64; from pathlib import Path; p=Path('launcher_app/assets'); (p/'aeon_ark_icon.jpg').write_bytes(base64.b64decode((p/'aeon_ark_icon.jpg.b64').read_text().strip(), validate=True))"
           python -c "from PIL import Image; Image.open('launcher_app/assets/aeon_ark_icon.jpg').save('launcher_app/assets/aeon_ark_icon.ico', format='ICO', sizes=[(256,256),(128,128),(64,64),(48,48),(32,32),(16,16)])"
