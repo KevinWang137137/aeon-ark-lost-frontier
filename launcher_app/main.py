@@ -26,7 +26,7 @@ def create_desktop_shortcut() -> Path | None:
 
     executable = Path(sys.executable).resolve()
     shortcut = desktop / "Aeon Ark Launcher.lnk"
-    script = "\\n".join([
+    script = "\n".join([
         "$shell = New-Object -ComObject WScript.Shell",
         f"$link = $shell.CreateShortcut({_powershell_literal(str(shortcut))})",
         f"$link.TargetPath = {_powershell_literal(str(executable))}",
@@ -67,7 +67,7 @@ def move_to_recycle_bin(target: Path) -> None:
         ]
 
     # SHFileOperationW requires a double-NUL-terminated path list.
-    source = ctypes.create_unicode_buffer(str(target) + "\\0")
+    source = ctypes.create_unicode_buffer(str(target) + "\0")
     operation = SHFILEOPSTRUCTW()
     operation.wFunc = 3  # FO_DELETE
     operation.pFrom = ctypes.cast(source, wintypes.LPCWSTR)
@@ -290,10 +290,10 @@ class MainWindow(QMainWindow):
             self.status.setText("桌面快捷方式已创建")
             QMessageBox.information(
                 self, "创建成功",
-                f"已在桌面创建快捷方式：\\n{shortcut}\\n快捷方式使用 EXE 内嵌的 Aeon Ark 图标。"
+                f"已在桌面创建快捷方式：\n{shortcut}\n快捷方式使用 EXE 内嵌的 Aeon Ark 图标。"
             )
         except Exception as exc:
-            QMessageBox.warning(self, "创建失败", f"无法创建桌面快捷方式：\\n{type(exc).__name__}: {exc}")
+            QMessageBox.warning(self, "创建失败", f"无法创建桌面快捷方式：\n{type(exc).__name__}: {exc}")
 
     def delete_instance(self):
         if not self.selected_dir:
@@ -308,8 +308,8 @@ class MainWindow(QMainWindow):
             answer = QMessageBox.question(
                 self,
                 "删除游戏实例",
-                f"确定将“{name}”移入 Windows 回收站吗？\\n\\n"
-                "此实例中的模组、配置、世界存档和设置都会一起移入回收站。\\n"
+                f"确定将“{name}”移入 Windows 回收站吗？\n\n"
+                "此实例中的模组、配置、世界存档和设置都会一起移入回收站。\n"
                 "你可以之后从回收站恢复。",
                 QMessageBox.Yes | QMessageBox.No,
                 QMessageBox.No,
@@ -328,7 +328,7 @@ class MainWindow(QMainWindow):
             self.status.setText(f"已将“{name}”移入回收站")
             QMessageBox.information(self, "删除完成", f"“{name}”已移入 Windows 回收站。")
         except Exception as exc:
-            QMessageBox.critical(self, "删除失败", f"未能删除所选游戏：\\n{type(exc).__name__}: {exc}")
+            QMessageBox.critical(self, "删除失败", f"未能删除所选游戏：\n{type(exc).__name__}: {exc}")
 
     def import_pack(self):
         filename, _ = QFileDialog.getOpenFileName(self, "导入 Minecraft 整合包", "", "整合包 (*.mrpack *.zip)")
