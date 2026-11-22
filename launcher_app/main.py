@@ -2,10 +2,12 @@ from __future__ import annotations
 import json, os, re, shutil, sys, zipfile
 from pathlib import Path
 from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QListWidget, QListWidgetItem, QFileDialog, QMessageBox, QProgressBar, QFrame
 
 APP_ROOT = Path(os.environ.get("APPDATA", str(Path.home()))) / "AeonArkLauncher"
 INSTANCES = APP_ROOT / "instances"
+ICON_PATH = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent)) / "assets" / "aeon_ark_icon.ico"
 
 def safe_extract_zip(source: Path, destination: Path):
     allowed = {"mods", "config", "global_packs", "resourcepacks", "shaderpacks", "options.txt"}
@@ -66,6 +68,8 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Aeon Ark Launcher")
+        if ICON_PATH.exists():
+            self.setWindowIcon(QIcon(str(ICON_PATH)))
         self.resize(980, 650)
         self.setMinimumSize(820, 560)
         self.selected_dir = None
@@ -248,6 +252,8 @@ class MainWindow(QMainWindow):
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName("Aeon Ark Launcher")
+    if ICON_PATH.exists():
+        app.setWindowIcon(QIcon(str(ICON_PATH)))
     window = MainWindow()
     window.show()
     sys.exit(app.exec())
