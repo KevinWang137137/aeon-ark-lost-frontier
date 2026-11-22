@@ -75,6 +75,8 @@ jobs:
             - Import `.mrpack` modpacks and ZIP packs containing `mods/`, `config/`, and `global_packs/`.
             - Install each imported pack into its own isolated instance folder under `%APPDATA%\\AeonArkLauncher\\instances`.
             - Display installed packs and open their instance folders.
+            - Create a desktop shortcut automatically on first launch; the shortcut uses the icon embedded in the EXE.
+            - Delete selected instances after confirmation; the full instance, including worlds and settings, is moved to the Windows Recycle Bin.
             - The icon is embedded into the EXE and also used by the launcher window.
 
             ## Preview limitation
