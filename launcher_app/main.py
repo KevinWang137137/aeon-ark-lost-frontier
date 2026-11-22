@@ -1,5 +1,5 @@
 from __future__ import annotations
-import json, os, re, shutil, sys, zipfile
+import json, os, re, shutil, subprocess, sys, zipfile
 from pathlib import Path
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QIcon
@@ -8,6 +8,73 @@ from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, Q
 APP_ROOT = Path(os.environ.get("APPDATA", str(Path.home()))) / "AeonArkLauncher"
 INSTANCES = APP_ROOT / "instances"
 ICON_PATH = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent)) / "assets" / "aeon_ark_icon.ico"
+
+def _powershell_literal(value: str) -> str:
+    return "'" + value.replace("'", "''") + "'"
+
+def create_desktop_shortcut() -> Path | None:
+    """Create/update a desktop shortcut using the icon embedded in this EXE."""
+    if os.name != "nt" or not getattr(sys, "frozen", False):
+        return None
+
+    import ctypes
+
+    desktop_buffer = ctypes.create_unicode_buffer(32768)
+    result = ctypes.windll.shell32.SHGetFolderPathW(None, 0x10, None, 0, desktop_buffer)
+    desktop = Path(desktop_buffer.value) if result == 0 and desktop_buffer.value else Path.home() / "Desktop"
+    desktop.mkdir(parents=True, exist_ok=True)
+
+    executable = Path(sys.executable).resolve()
+    shortcut = desktop / "Aeon Ark Launcher.lnk"
+    script = "\\n".join([
+        "$shell = New-Object -ComObject WScript.Shell",
+        f"$link = $shell.CreateShortcut({_powershell_literal(str(shortcut))})",
+        f"$link.TargetPath = {_powershell_literal(str(executable))}",
+        f"$link.WorkingDirectory = {_powershell_literal(str(executable.parent))}",
+        f"$link.IconLocation = {_powershell_literal(str(executable) + ',0')}",
+        "$link.Description = 'Aeon Ark: The Lost Frontier Launcher'",
+        "$link.Save()",
+    ])
+    subprocess.run(
+        ["powershell.exe", "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        timeout=15,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+    return shortcut
+
+def move_to_recycle_bin(target: Path) -> None:
+    """Move a selected instance directory to the Windows Recycle Bin."""
+    if os.name != "nt":
+        raise RuntimeError("删除实例并移入回收站仅支持 Windows。")
+
+    import ctypes
+    from ctypes import wintypes
+
+    class SHFILEOPSTRUCTW(ctypes.Structure):
+        _fields_ = [
+            ("hwnd", wintypes.HWND),
+            ("wFunc", ctypes.c_uint),
+            ("pFrom", wintypes.LPCWSTR),
+            ("pTo", wintypes.LPCWSTR),
+            ("fFlags", ctypes.c_ushort),
+            ("fAnyOperationsAborted", wintypes.BOOL),
+            ("hNameMappings", wintypes.LPVOID),
+            ("lpszProgressTitle", wintypes.LPCWSTR),
+        ]
+
+    # SHFileOperationW requires a double-NUL-terminated path list.
+    source = ctypes.create_unicode_buffer(str(target) + "\\0")
+    operation = SHFILEOPSTRUCTW()
+    operation.wFunc = 3  # FO_DELETE
+    operation.pFrom = ctypes.cast(source, wintypes.LPCWSTR)
+    operation.fFlags = 0x0040 | 0x0010 | 0x0004 | 0x0400  # allow undo / quiet UI
+    result = ctypes.windll.shell32.SHFileOperationW(ctypes.byref(operation))
+    if result != 0 or operation.fAnyOperationsAborted:
+        raise OSError(result or 1, "Windows could not move the game instance to the Recycle Bin.")
 
 def safe_extract_zip(source: Path, destination: Path):
     allowed = {"mods", "config", "global_packs", "resourcepacks", "shaderpacks", "options.txt"}
@@ -98,6 +165,14 @@ class MainWindow(QMainWindow):
         import_btn.setObjectName("primary")
         import_btn.clicked.connect(self.import_pack)
         side.addWidget(import_btn)
+        self.shortcut_btn = QPushButton("在桌面创建快捷方式")
+        self.shortcut_btn.clicked.connect(self.create_shortcut)
+        side.addWidget(self.shortcut_btn)
+        self.delete_btn = QPushButton("删除所选游戏")
+        self.delete_btn.setObjectName("danger")
+        self.delete_btn.setEnabled(False)
+        self.delete_btn.clicked.connect(self.delete_instance)
+        side.addWidget(self.delete_btn)
         side.addWidget(QLabel("支持 .mrpack 和 FullFiles ZIP"))
         content = QVBoxLayout()
         # Add the sidebar widget, not its QVBoxLayout, to the root layout.
@@ -168,6 +243,8 @@ class MainWindow(QMainWindow):
             QPushButton:disabled { color:#667085; background:#202b3d; }
             QPushButton#primary { background:#d5a84e; color:#172033; border:0; font-size:16px; }
             QPushButton#primary:hover { background:#edc46f; }
+            QPushButton#danger { background:#552b36; color:#ffe4e8; border:1px solid #7f3c4b; }
+            QPushButton#danger:hover { background:#713746; }
             QProgressBar { background:#202b3d; border:0; border-radius:5px; height:8px; }
             QProgressBar::chunk { background:#d5a84e; border-radius:5px; }
         """)
@@ -194,6 +271,7 @@ class MainWindow(QMainWindow):
             self.selected_dir = None
             self.play.setEnabled(False)
             self.folder.setEnabled(False)
+            self.delete_btn.setEnabled(False)
             return
         self.selected_dir = Path(current.data(Qt.UserRole))
         data = json.loads((self.selected_dir / "instance.json").read_text(encoding="utf-8"))
@@ -201,6 +279,56 @@ class MainWindow(QMainWindow):
         self.pack_summary.setText(data.get("summary") or f'Minecraft {data.get("minecraft_version") or "版本信息由整合包提供"} · 独立实例')
         self.play.setEnabled(True)
         self.folder.setEnabled(True)
+        self.delete_btn.setEnabled(True)
+
+    def create_shortcut(self):
+        try:
+            shortcut = create_desktop_shortcut()
+            if shortcut is None:
+                QMessageBox.information(self, "桌面快捷方式", "请使用打包后的 AeonArkLauncher.exe 运行此功能。")
+                return
+            self.status.setText("桌面快捷方式已创建")
+            QMessageBox.information(
+                self, "创建成功",
+                f"已在桌面创建快捷方式：\\n{shortcut}\\n快捷方式使用 EXE 内嵌的 Aeon Ark 图标。"
+            )
+        except Exception as exc:
+            QMessageBox.warning(self, "创建失败", f"无法创建桌面快捷方式：\\n{type(exc).__name__}: {exc}")
+
+    def delete_instance(self):
+        if not self.selected_dir:
+            return
+        try:
+            root = INSTANCES.resolve()
+            target = self.selected_dir.resolve()
+            if target.parent != root or target == root or not (target / "instance.json").is_file():
+                raise ValueError("选中的目录不是启动器管理的有效游戏实例，已拒绝删除。")
+            metadata = json.loads((target / "instance.json").read_text(encoding="utf-8"))
+            name = metadata.get("name") or target.name
+            answer = QMessageBox.question(
+                self,
+                "删除游戏实例",
+                f"确定将“{name}”移入 Windows 回收站吗？\\n\\n"
+                "此实例中的模组、配置、世界存档和设置都会一起移入回收站。\\n"
+                "你可以之后从回收站恢复。",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if answer != QMessageBox.Yes:
+                return
+            move_to_recycle_bin(target)
+            self.selected_dir = None
+            self.refresh_instances()
+            if self.instances.count() == 0:
+                self.pack_name.setText("请先从左侧导入一个整合包")
+                self.pack_summary.setText("导入后，启动器会为它创建独立的游戏目录，不会覆盖你现有的世界。")
+                self.play.setEnabled(False)
+                self.folder.setEnabled(False)
+                self.delete_btn.setEnabled(False)
+            self.status.setText(f"已将“{name}”移入回收站")
+            QMessageBox.information(self, "删除完成", f"“{name}”已移入 Windows 回收站。")
+        except Exception as exc:
+            QMessageBox.critical(self, "删除失败", f"未能删除所选游戏：\\n{type(exc).__name__}: {exc}")
 
     def import_pack(self):
         filename, _ = QFileDialog.getOpenFileName(self, "导入 Minecraft 整合包", "", "整合包 (*.mrpack *.zip)")
@@ -255,6 +383,13 @@ def main():
     if ICON_PATH.exists():
         app.setWindowIcon(QIcon(str(ICON_PATH)))
     window = MainWindow()
+    try:
+        shortcut = create_desktop_shortcut()
+        if shortcut:
+            window.status.setText("已在桌面创建 Aeon Ark 快捷方式")
+    except Exception:
+        # Shortcut creation can be retried from the sidebar button.
+        pass
     window.show()
     sys.exit(app.exec())
 
