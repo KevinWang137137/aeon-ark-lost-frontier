@@ -96,7 +96,8 @@ class MainWindow(QMainWindow):
         side.addWidget(import_btn)
         side.addWidget(QLabel("支持 .mrpack 和 FullFiles ZIP"))
         content = QVBoxLayout()
-        layout.addWidget(side)
+        # Add the sidebar widget, not its QVBoxLayout, to the root layout.
+        layout.addWidget(sidebar)
         layout.addLayout(content, 1)
         top = QHBoxLayout()
         heading = QLabel("游戏库")
