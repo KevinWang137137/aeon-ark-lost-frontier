@@ -63,9 +63,9 @@ jobs:
             ## 安装
             1. 下载本页唯一的 AeonArk-26.3-Fabric ZIP。
             2. 将 ZIP 文件直接拖入 PCL 窗口，按提示创建独立游戏版本。
-            3. 首次安装需要联网；PCL 会根据 ZIP 内的 Modrinth 清单下载 Minecraft、Fabric 和模组。
+            3. 首次安装需要联网；ZIP 已内置所有实际模组 JAR、配置、任务和数据包；PCL 仅需按 MMC 组件信息安装 Minecraft/Fabric 本体与运行库。
             4. 使用 Java 25 x64，建议先分配 5GB 内存。
             5. 安装完成后创建新世界进行测试；不要用测试版覆盖已有存档。
 
-            ZIP 根目录包含 modrinth.index.json，配置与任务数据位于 overrides/。
+            ZIP 根目录包含 mmc-pack.json 与 instance.cfg；完整客户端内容位于 .minecraft/，实际模组 JAR 已打包，不需要逐个下载。
             本版仍为预览版；世界出生点、任务计数和长时间稳定性需要实际游戏验收。
