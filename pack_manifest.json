@@ -1,20 +1,32 @@
 {
-  "project":"方舟纪元：失落的世界",
-  "english":"Aeon Ark: The Lost Frontier",
-  "build":"0.2.0-alpha.3",
-  "minecraft":"26.3",
-  "loader":"Fabric",
-  "fabric_loader":"0.20.1",
-  "fabric_api":"0.166.2+26.3",
-  "java":"25 (64-bit)",
-  "launcher_target":"PCL / PCL2",
-  "difficulty":"标准生存",
-  "starting_style":"Dreamcraft式特殊小岛开局（候选种子，尚未游戏内验证）",
-  "seed_candidate":"3404544535694295634",
-  "spawn_candidate":{"x":704,"z":64,"surface_y":78,"verified":false},
-  "memory_target_gb":5,
-  "quests":{"implemented":72,"categories":8,"planned_total":360},
-  "status":"工程预览版；静态校验通过，Windows构建、PCL导入和客户端启动尚未验收",
-  "third_party_mod_jars_in_repository":false,
-  "worldgen":{"biome_pack":"Terralith 2.6.5+26.3","enabled_by_default":false,"reason":"先保证特殊小岛出生点不受未经验证的世界生成改动影响"}
+  "project": "方舟纪元：失落的世界",
+  "english": "Aeon Ark: The Lost Frontier",
+  "build": "0.2.0-alpha.9",
+  "minecraft": "26.3",
+  "loader": "Fabric",
+  "fabric_loader": "0.20.1",
+  "java": "25 (64-bit)",
+  "launcher_target": "PCL ZIP drag-and-drop import",
+  "difficulty": "标准生存",
+  "starting_style": "Dreamcraft式特殊小岛开局（候选种子，尚未游戏内验证）",
+  "seed_candidate": "3404544535694295634",
+  "spawn_candidate": {
+    "x": 704,
+    "z": 64,
+    "surface_y": 78,
+    "verified": false
+  },
+  "memory_target_gb": 5,
+  "quests": {
+    "implemented": 72,
+    "categories": 8,
+    "planned_total": 360
+  },
+  "status": "预览版；PCL Modrinth ZIP 构建流程已接入，仍待实际导入、客户端启动和游戏内验收",
+  "third_party_mod_jars_in_repository": false,
+  "worldgen": {
+    "biome_pack": "Terralith 2.6.5+26.3",
+    "enabled_by_default": false,
+    "reason": "先保证特殊小岛出生点不受未经验证的世界生成改动影响"
+  }
 }
