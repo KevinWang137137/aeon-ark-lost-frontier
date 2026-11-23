@@ -142,11 +142,11 @@ try {
     $Check = [IO.Compression.ZipFile]::OpenRead($PackZip)
     try {
         if ($null -eq $Check.GetEntry('mmc-pack.json') -or $null -eq $Check.GetEntry('instance.cfg')) { throw 'ZIP 根目录缺少 PCL 可识别的 MMC 整合包文件' }
-        $ModEntries = @($Check.Entries | Where-Object {$_.FullName -match '^\.minecraft/mods/[^/]+\.jar
-    } finally { $Check.Dispose() }
-    Write-Host "构建完成：$PackZip" -ForegroundColor Green
-    Write-Host "必需与自动依赖模组：$($IndexFiles.Count)；可选跳过：$($Warnings.Count)" -ForegroundColor Green
-    Write-Host '将此 ZIP 直接拖入 PCL 导入；模组 JAR、配置和任务数据已包含在 ZIP 中；PCL 仅需按实例组件安装 Minecraft/Fabric 及其运行库。建议 Java 25 x64，内存先设为 5GB。' -ForegroundColor Yellow
+        $ModEntries = @($Check.Entries | Where-Object { $_.FullName -match '^\.minecraft/mods/[^/]+\.jar$' })
+        if ($ModEntries.Count -ne $IndexFiles.Count) { throw "模组打包数量不一致：ZIP=$($ModEntries.Count)，解析=$($IndexFiles.Count)" }
+        if ($ModEntries.Count -eq 0) { throw 'ZIP 中没有实际模组 JAR 文件' }
+        if (@($Check.Entries | Where-Object { $_.FullName -like '.minecraft/config/*' }).Count -eq 0) { throw 'ZIP 中缺少 .minecraft/config 配置文件' }
+        Write-Host "PCL 完整包验证通过：$($ModEntries.Count) 个实际模组 JAR 已装入 ZIP，$(@($Check.Entries).Count) 个压缩条目" -ForegroundColor Green
 } catch {
     Write-Host "构建失败：$($_.Exception.Message)" -ForegroundColor Red
     Write-Host $_.ScriptStackTrace -ForegroundColor DarkYellow
