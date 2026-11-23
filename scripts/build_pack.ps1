@@ -47,7 +47,7 @@ function Download-Verified($File,[string]$Path) {
         if ($Hash -ne $File.hashes.sha1.ToLower()) { throw "SHA-1 校验失败：$($File.filename)" }
     } else { throw "Modrinth 未提供哈希：$($File.filename)" }
 }
-function Add-Version($Meta,$Version) {
+function Add-Version($Meta,$Version,[bool]$Optional = $false) {
     if ($Resolved.ContainsKey($Meta.id)) { return }
     if (-not ($Version.game_versions -contains $Game) -or -not ($Version.loaders -contains $Loader)) { throw "$($Meta.title) 的依赖版本不支持 $Game / $Loader" }
     $File = Get-File $Version '.jar'
@@ -55,8 +55,9 @@ function Add-Version($Meta,$Version) {
     $ModNames[$File.filename] = $true
     if (-not $File.hashes.sha1 -and -not $File.hashes.sha512) { throw "Modrinth 未提供可校验哈希：$($File.filename)" }
     if (-not $File.url -or [long]$File.size -le 0) { throw "Modrinth 文件信息不完整：$($File.filename)" }
-    $Client = if ($Meta.client_side) { $Meta.client_side } else { 'required' }
-    $Server = if ($Meta.server_side) { $Meta.server_side } else { 'required' }
+    $DefaultEnv = if ($Optional) { 'optional' } else { 'required' }
+    $Client = if ($Meta.client_side -eq 'unsupported') { 'unsupported' } elseif ($Optional) { 'optional' } elseif ($Meta.client_side) { $Meta.client_side } else { 'required' }
+    $Server = if ($Meta.server_side -eq 'unsupported') { 'unsupported' } elseif ($Optional) { 'optional' } elseif ($Meta.server_side) { $Meta.server_side } else { 'required' }
     $IndexFiles.Add([ordered]@{path="mods/$($File.filename)";hashes=$File.hashes;env=@{client=$Client;server=$Server};downloads=@($File.url);fileSize=[long]$File.size})
     $Resolved[$Meta.id] = @{name=$Meta.title;version=$Version.version_number;filename=$File.filename;version_id=$Version.id}
     Write-Host "[MOD] $($Meta.title) -> $($Version.version_number)" -ForegroundColor Green
@@ -75,7 +76,7 @@ function Add-Project([string]$Project,[bool]$Required) {
         if ($Resolved.ContainsKey($Meta.id)) { return }
         $Version = Get-Version $Meta.id @($Loader)
         if ($null -eq $Version) { throw "没有 $Game / $Loader 发布文件" }
-        Add-Version $Meta $Version
+        Add-Version $Meta $Version (-not $Required)
     } catch {
         if ($Required) { throw "必需模组/依赖 $Project 失败：$($_.Exception.Message)" }
         $Warnings.Add("可选模组 $Project 跳过：$($_.Exception.Message)")
