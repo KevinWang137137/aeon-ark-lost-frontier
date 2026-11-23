@@ -106,6 +106,7 @@ try {
     Write-Host "=== 方舟纪元：失落的世界 | Minecraft $Game / Fabric ===" -ForegroundColor Cyan
     & (Join-Path $Root 'scripts/expand_quest_bundle.ps1')
     if (Test-Path $Stage) { Remove-Item $Stage -Recurse -Force }
+    if (Test-Path $Out) { Remove-Item $Out -Recurse -Force }
     New-Item -ItemType Directory -Force -Path $Overrides,$Out | Out-Null
     Copy-Item (Join-Path $Root 'config') (Join-Path $Overrides 'config') -Recurse -Force
     Copy-Item (Join-Path $Root 'global_packs') (Join-Path $Overrides 'global_packs') -Recurse -Force
