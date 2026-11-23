@@ -5,12 +5,12 @@ $Api = 'https://api.modrinth.com/v2'
 $Game = '26.3'
 $Loader = 'fabric'
 $LoaderVersion = '0.20.1'
-$PackVersion = '0.2.0-alpha.3'
+$PackVersion = (Get-Content (Join-Path $Root '.github/release-version.txt') -Raw).Trim()
+if ($PackVersion -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') { throw "无效的发布版本号：$PackVersion" }
 $Out = Join-Path $Root 'release'
 $Stage = Join-Path $Root '.build_mrpack'
 $Overrides = Join-Path $Stage 'overrides'
-$Local = Join-Path $Root '.build_full_zip'
-$LocalMods = Join-Path $Local 'mods'
+$ModNames = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
 $IndexFiles = New-Object System.Collections.Generic.List[object]
 $Resolved = @{}
 $MetaCache = @{}
@@ -51,8 +51,9 @@ function Add-Version($Meta,$Version) {
     if ($Resolved.ContainsKey($Meta.id)) { return }
     if (-not ($Version.game_versions -contains $Game) -or -not ($Version.loaders -contains $Loader)) { throw "$($Meta.title) 的依赖版本不支持 $Game / $Loader" }
     $File = Get-File $Version '.jar'
-    if (Test-Path (Join-Path $LocalMods $File.filename)) { throw "不同项目出现同名 JAR：$($File.filename)" }
-    Download-Verified $File (Join-Path $LocalMods $File.filename)
+    if (-not $ModNames.Add($File.filename)) { throw "不同项目出现同名 JAR：$($File.filename)" }
+    if (-not $File.hashes.sha1 -and -not $File.hashes.sha512) { throw "Modrinth 未提供可校验哈希：$($File.filename)" }
+    if (-not $File.url -or [long]$File.size -le 0) { throw "Modrinth 文件信息不完整：$($File.filename)" }
     $Client = if ($Meta.client_side) { $Meta.client_side } else { 'required' }
     $Server = if ($Meta.server_side) { $Meta.server_side } else { 'required' }
     $IndexFiles.Add([ordered]@{path="mods/$($File.filename)";hashes=$File.hashes;env=@{client=$Client;server=$Server};downloads=@($File.url);fileSize=[long]$File.size})
@@ -104,8 +105,7 @@ try {
     Write-Host "=== 方舟纪元：失落的世界 | Minecraft $Game / Fabric ===" -ForegroundColor Cyan
     & (Join-Path $Root 'scripts/expand_quest_bundle.ps1')
     if (Test-Path $Stage) { Remove-Item $Stage -Recurse -Force }
-    if (Test-Path $Local) { Remove-Item $Local -Recurse -Force }
-    New-Item -ItemType Directory -Force -Path $Overrides,$LocalMods,$Out | Out-Null
+    New-Item -ItemType Directory -Force -Path $Overrides,$Out | Out-Null
     Copy-Item (Join-Path $Root 'config') (Join-Path $Overrides 'config') -Recurse -Force
     Copy-Item (Join-Path $Root 'global_packs') (Join-Path $Overrides 'global_packs') -Recurse -Force
     $Manifest = Get-Content (Join-Path $Root 'modpack_sources.json') -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -118,24 +118,28 @@ try {
     }
     $Index = [ordered]@{formatVersion=1;game='minecraft';versionId=$PackVersion;name='方舟纪元：失落的世界';summary='Minecraft 26.3 Fabric · 标准生存 · 小岛开局 · 中文任务冒险';files=@($IndexFiles);dependencies=@{minecraft=$Game;'fabric-loader'=$LoaderVersion}}
     [IO.File]::WriteAllText((Join-Path $Stage 'modrinth.index.json'),($Index | ConvertTo-Json -Depth 30),$Utf8)
-    Copy-Item (Join-Path $Root 'config') (Join-Path $Local 'config') -Recurse -Force
-    Copy-Item (Join-Path $Root 'global_packs') (Join-Path $Local 'global_packs') -Recurse -Force
-    Copy-Item (Join-Path $Root 'README_先看这里.md') $Local -Force
-    Copy-Item (Join-Path $Root 'pack_manifest.json') $Local -Force
     $Report = [ordered]@{minecraft=$Game;loader=$Loader;loader_version=$LoaderVersion;resolved=$Resolved;warnings=@($Warnings)}
-    [IO.File]::WriteAllText((Join-Path $Local 'mod-resolution-report.json'),($Report | ConvertTo-Json -Depth 30),$Utf8)
+    [IO.File]::WriteAllText((Join-Path $Overrides 'aeon-ark-mod-resolution-report.json'),($Report | ConvertTo-Json -Depth 30),$Utf8)
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $FullZip = Join-Path $Out "AeonArk-26.3-Fabric-v$PackVersion-FullFiles.zip"
-    $Mrpack = Join-Path $Out "AeonArk-26.3-Fabric-v$PackVersion.mrpack"
-    foreach ($Path in @($FullZip,$Mrpack)) { if (Test-Path $Path) { Remove-Item $Path -Force } }
-    [IO.Compression.ZipFile]::CreateFromDirectory($Local,$FullZip,[IO.Compression.CompressionLevel]::Optimal,$false)
-    $Check = [IO.Compression.ZipFile]::OpenRead($FullZip)
+    $PackZip = Join-Path $Out "AeonArk-26.3-Fabric-v$PackVersion.zip"
+    if (Test-Path $PackZip) { Remove-Item $PackZip -Force }
+    # PCL recognises a Modrinth pack ZIP when modrinth.index.json is at archive root.
+    [IO.Compression.ZipFile]::CreateFromDirectory($Stage,$PackZip,[IO.Compression.CompressionLevel]::Optimal,$false)
+    $Check = [IO.Compression.ZipFile]::OpenRead($PackZip)
     try {
-        $Jars = @($Check.Entries | Where-Object {$_.FullName -match '^mods/.+\.jar$'}).Count
-        if ($Jars -eq 0) { throw '完整文件 ZIP 中没有 mods/*.jar' }
-        Write-Host "完整文件 ZIP JAR 数：$Jars" -ForegroundColor Green
+        if ($null -eq $Check.GetEntry('modrinth.index.json')) { throw 'ZIP 根目录缺少 modrinth.index.json，PCL 无法按 Modrinth 整合包识别' }
+        if (@($Check.Entries | Where-Object {$_.FullName -like 'overrides/config/*'}).Count -eq 0) { throw 'ZIP 中缺少 overrides/config 配置文件' }
+        $IndexEntry = $Check.GetEntry('modrinth.index.json')
+        $Reader = New-Object IO.StreamReader($IndexEntry.Open())
+        try { $ZipIndex = $Reader.ReadToEnd() | ConvertFrom-Json } finally { $Reader.Dispose() }
+        if ($ZipIndex.formatVersion -ne 1 -or $ZipIndex.game -ne 'minecraft') { throw 'Modrinth index 格式检查失败' }
+        if ($ZipIndex.dependencies.minecraft -ne $Game) { throw '清单中的 Minecraft 版本与构建版本不一致' }
+        if (@($ZipIndex.files).Count -eq 0) { throw '清单中没有任何可下载模组' }
+        Write-Host "PCL ZIP 验证通过：$(@($ZipIndex.files).Count) 个模组条目，$(@($Check.Entries).Count) 个压缩条目" -ForegroundColor Green
     } finally { $Check.Dispose() }
-    [IO.Compression.ZipFile]::CreateFromDirectory($Stage,$Mrpack,[IO.Compression.CompressionLevel]::Optimal,$false)
+    Write-Host "构建完成：$PackZip" -ForegroundColor Green
+    Write-Host "必需与自动依赖模组：$($IndexFiles.Count)；可选跳过：$($Warnings.Count)" -ForegroundColor Green
+    Write-Host '将此 ZIP 直接拖入 PCL 导入；首次安装需要联网下载 Minecraft、Fabric 和模组。建议 Java 25 x64，内存先设为 5GB。' -ForegroundColor Yellow
     Write-Host "构建完成：$FullZip" -ForegroundColor Green
     Write-Host "构建完成：$Mrpack" -ForegroundColor Green
     Write-Host "必需与自动依赖模组：$($IndexFiles.Count)；可选跳过：$($Warnings.Count)" -ForegroundColor Green
