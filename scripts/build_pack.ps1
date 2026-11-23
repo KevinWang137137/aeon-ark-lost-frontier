@@ -10,7 +10,7 @@ if ($PackVersion -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') { throw "无效�
 $Out = Join-Path $Root 'release'
 $Stage = Join-Path $Root '.build_mrpack'
 $Overrides = Join-Path $Stage 'overrides'
-$ModNames = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+$ModNames = @{}
 $IndexFiles = New-Object System.Collections.Generic.List[object]
 $Resolved = @{}
 $MetaCache = @{}
@@ -51,7 +51,8 @@ function Add-Version($Meta,$Version) {
     if ($Resolved.ContainsKey($Meta.id)) { return }
     if (-not ($Version.game_versions -contains $Game) -or -not ($Version.loaders -contains $Loader)) { throw "$($Meta.title) 的依赖版本不支持 $Game / $Loader" }
     $File = Get-File $Version '.jar'
-    if (-not $ModNames.Add($File.filename)) { throw "不同项目出现同名 JAR：$($File.filename)" }
+    if ($ModNames.ContainsKey($File.filename)) { throw "不同项目出现同名 JAR：$($File.filename)" }
+    $ModNames[$File.filename] = $true
     if (-not $File.hashes.sha1 -and -not $File.hashes.sha512) { throw "Modrinth 未提供可校验哈希：$($File.filename)" }
     if (-not $File.url -or [long]$File.size -le 0) { throw "Modrinth 文件信息不完整：$($File.filename)" }
     $Client = if ($Meta.client_side) { $Meta.client_side } else { 'required' }
@@ -140,10 +141,6 @@ try {
     Write-Host "构建完成：$PackZip" -ForegroundColor Green
     Write-Host "必需与自动依赖模组：$($IndexFiles.Count)；可选跳过：$($Warnings.Count)" -ForegroundColor Green
     Write-Host '将此 ZIP 直接拖入 PCL 导入；首次安装需要联网下载 Minecraft、Fabric 和模组。建议 Java 25 x64，内存先设为 5GB。' -ForegroundColor Yellow
-    Write-Host "构建完成：$FullZip" -ForegroundColor Green
-    Write-Host "构建完成：$Mrpack" -ForegroundColor Green
-    Write-Host "必需与自动依赖模组：$($IndexFiles.Count)；可选跳过：$($Warnings.Count)" -ForegroundColor Green
-    Write-Host '请在 PCL 使用 Java 25 x64；用新世界测试小岛出生，不要覆盖旧存档。' -ForegroundColor Yellow
 } catch {
     Write-Host "构建失败：$($_.Exception.Message)" -ForegroundColor Red
     exit 1
