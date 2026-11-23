@@ -8,8 +8,9 @@ $LoaderVersion = '0.20.1'
 $PackVersion = (Get-Content (Join-Path $Root '.github/release-version.txt') -Raw).Trim()
 if ($PackVersion -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') { throw "无效的发布版本号：$PackVersion" }
 $Out = Join-Path $Root 'release'
-$Stage = Join-Path $Root '.build_mrpack'
-$Overrides = Join-Path $Stage 'overrides'
+$Stage = Join-Path $Root '.build_full_pack'
+$GameRoot = Join-Path $Stage '.minecraft'
+$ModsDir = Join-Path $GameRoot 'mods'
 $ModNames = @{}
 $IndexFiles = New-Object System.Collections.Generic.List[object]
 $Resolved = @{}
@@ -58,7 +59,8 @@ function Add-Version($Meta,$Version,[bool]$Optional = $false) {
     $DefaultEnv = if ($Optional) { 'optional' } else { 'required' }
     $Client = if ($Meta.client_side -eq 'unsupported') { 'unsupported' } elseif ($Optional) { 'optional' } elseif ($Meta.client_side) { $Meta.client_side } else { 'required' }
     $Server = if ($Meta.server_side -eq 'unsupported') { 'unsupported' } elseif ($Optional) { 'optional' } elseif ($Meta.server_side) { $Meta.server_side } else { 'required' }
-    $IndexFiles.Add([ordered]@{path="mods/$($File.filename)";hashes=$File.hashes;env=@{client=$Client;server=$Server};downloads=@($File.url);fileSize=[long]$File.size})
+    Download-Verified $File (Join-Path $ModsDir $File.filename)
+    $IndexFiles.Add([ordered]@{filename=$File.filename;version=$Version.version_number;project=$Meta.id;sha1=$File.hashes.sha1;sha512=$File.hashes.sha512;size=[long]$File.size})
     $Resolved[$Meta.id] = @{name=$Meta.title;version=$Version.version_number;filename=$File.filename;version_id=$Version.id}
     Write-Host "[MOD] $($Meta.title) -> $($Version.version_number)" -ForegroundColor Green
     foreach ($Dep in @($Version.dependencies)) {
@@ -92,7 +94,7 @@ function Add-Datapack([string]$Project,[string]$Filename,[string]$Directory,[boo
         # Store the verified datapack in source so both MRPACK and PCL ZIP include it.
         $Destination = Join-Path $Root "global_packs/$Directory/$Filename"
         Download-Verified $File $Destination
-        $StageDestination = Join-Path $Overrides "global_packs/$Directory/$Filename"
+        $StageDestination = Join-Path $GameRoot "global_packs/$Directory/$Filename"
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $StageDestination) | Out-Null
         Copy-Item $Destination $StageDestination -Force
         Write-Host "[DATAPACK] $Project -> $($Version.version_number)" -ForegroundColor Green
@@ -108,9 +110,13 @@ try {
     & (Join-Path $Root 'scripts/expand_quest_bundle.ps1')
     if (Test-Path $Stage) { Remove-Item $Stage -Recurse -Force }
     if (Test-Path $Out) { Remove-Item $Out -Recurse -Force }
-    New-Item -ItemType Directory -Force -Path $Overrides,$Out | Out-Null
-    Copy-Item (Join-Path $Root 'config') (Join-Path $Overrides 'config') -Recurse -Force
-    Copy-Item (Join-Path $Root 'global_packs') (Join-Path $Overrides 'global_packs') -Recurse -Force
+    New-Item -ItemType Directory -Force -Path $ModsDir,$Out | Out-Null
+    if (Test-Path (Join-Path $Root 'config')) { Copy-Item (Join-Path $Root 'config') (Join-Path $GameRoot 'config') -Recurse -Force }
+    if (Test-Path (Join-Path $Root 'global_packs')) { Copy-Item (Join-Path $Root 'global_packs') (Join-Path $GameRoot 'global_packs') -Recurse -Force }
+    foreach ($Folder in @('resourcepacks','shaderpacks','defaultconfigs','kubejs','scripts')) {
+        $Source = Join-Path $Root $Folder
+        if (Test-Path $Source) { Copy-Item $Source (Join-Path $GameRoot $Folder) -Recurse -Force }
+    }
     $Manifest = Get-Content (Join-Path $Root 'modpack_sources.json') -Raw -Encoding UTF8 | ConvertFrom-Json
     foreach ($Mod in $Manifest.required_mods) { Add-Project ([string]$Mod.project) $true }
     foreach ($Mod in $Manifest.optional_mods) { Add-Project ([string]$Mod.project) $false }
@@ -119,26 +125,40 @@ try {
         $Required = if ($null -ne $Pack.required) { [bool]$Pack.required } else { $false }
         Add-Datapack ([string]$Pack.project) ([string]$Pack.filename) $Dir $Required
     }
-    $Index = [ordered]@{formatVersion=1;game='minecraft';versionId=$PackVersion;name='方舟纪元：失落的世界';summary='Minecraft 26.3 Fabric · 标准生存 · 小岛开局 · 中文任务冒险';files=$IndexFiles.ToArray();dependencies=@{minecraft=$Game;'fabric-loader'=$LoaderVersion}}
-    [IO.File]::WriteAllText((Join-Path $Stage 'modrinth.index.json'),($Index | ConvertTo-Json -Depth 30),$Utf8)
+    $Components = @(
+        [ordered]@{uid='net.minecraft';version=$Game;important=$true},
+        [ordered]@{uid='net.fabricmc.fabric-loader';version=$LoaderVersion;important=$true}
+    )
+    $MmcPack = [ordered]@{components=$Components;formatVersion=1}
+    [IO.File]::WriteAllText((Join-Path $Stage 'mmc-pack.json'),($MmcPack | ConvertTo-Json -Depth 10),$Utf8)
+    [IO.File]::WriteAllText((Join-Path $Stage 'instance.cfg'),"InstanceType=OneSix`r`nname=Aeon Ark - The Lost Frontier`r`n",$Utf8)
     $Report = [ordered]@{minecraft=$Game;loader=$Loader;loader_version=$LoaderVersion;resolved=$Resolved;warnings=$Warnings.ToArray()}
-    [IO.File]::WriteAllText((Join-Path $Overrides 'aeon-ark-mod-resolution-report.json'),($Report | ConvertTo-Json -Depth 30),$Utf8)
+    [IO.File]::WriteAllText((Join-Path $GameRoot 'aeon-ark-mod-resolution-report.json'),($Report | ConvertTo-Json -Depth 30),$Utf8)
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $PackZip = Join-Path $Out "AeonArk-26.3-Fabric-v$PackVersion.zip"
     if (Test-Path $PackZip) { Remove-Item $PackZip -Force }
-    # PCL recognises a Modrinth pack ZIP when modrinth.index.json is at archive root.
+    # PCL recognises this as an MMC instance ZIP; actual mod JARs are bundled under .minecraft/mods.
     [IO.Compression.ZipFile]::CreateFromDirectory($Stage,$PackZip,[IO.Compression.CompressionLevel]::Optimal,$false)
     $Check = [IO.Compression.ZipFile]::OpenRead($PackZip)
     try {
-        if ($null -eq $Check.GetEntry('modrinth.index.json')) { throw 'ZIP 根目录缺少 modrinth.index.json，PCL 无法按 Modrinth 整合包识别' }
-        if (@($Check.Entries | Where-Object {$_.FullName -like 'overrides/config/*'}).Count -eq 0) { throw 'ZIP 中缺少 overrides/config 配置文件' }
-        $IndexEntry = $Check.GetEntry('modrinth.index.json')
-        $Reader = New-Object IO.StreamReader($IndexEntry.Open())
-        try { $ZipIndex = $Reader.ReadToEnd() | ConvertFrom-Json } finally { $Reader.Dispose() }
-        if ($ZipIndex.formatVersion -ne 1 -or $ZipIndex.game -ne 'minecraft') { throw 'Modrinth index 格式检查失败' }
-        if ($ZipIndex.dependencies.minecraft -ne $Game) { throw '清单中的 Minecraft 版本与构建版本不一致' }
-        if (@($ZipIndex.files).Count -eq 0) { throw '清单中没有任何可下载模组' }
-        Write-Host "PCL ZIP 验证通过：$(@($ZipIndex.files).Count) 个模组条目，$(@($Check.Entries).Count) 个压缩条目" -ForegroundColor Green
+        if ($null -eq $Check.GetEntry('mmc-pack.json') -or $null -eq $Check.GetEntry('instance.cfg')) { throw 'ZIP 根目录缺少 PCL 可识别的 MMC 整合包文件' }
+        $ModEntries = @($Check.Entries | Where-Object {$_.FullName -match '^\.minecraft/mods/[^/]+\.jar
+    } finally { $Check.Dispose() }
+    Write-Host "构建完成：$PackZip" -ForegroundColor Green
+    Write-Host "必需与自动依赖模组：$($IndexFiles.Count)；可选跳过：$($Warnings.Count)" -ForegroundColor Green
+    Write-Host '将此 ZIP 直接拖入 PCL 导入；模组 JAR、配置和任务数据已包含在 ZIP 中；PCL 仅需按实例组件安装 Minecraft/Fabric 及其运行库。建议 Java 25 x64，内存先设为 5GB。' -ForegroundColor Yellow
+} catch {
+    Write-Host "构建失败：$($_.Exception.Message)" -ForegroundColor Red
+    Write-Host $_.ScriptStackTrace -ForegroundColor DarkYellow
+    exit 1
+} finally {
+    if (Test-Path $Stage) { Remove-Item $Stage -Recurse -Force }
+}
+})
+        if ($ModEntries.Count -ne $IndexFiles.Count) { throw "模组打包数量不一致：ZIP=$($ModEntries.Count)，解析=$($IndexFiles.Count)" }
+        if ($ModEntries.Count -eq 0) { throw 'ZIP 中没有实际模组 JAR 文件' }
+        if (@($Check.Entries | Where-Object {$_.FullName -like '.minecraft/config/*'}).Count -eq 0) { throw 'ZIP 中缺少 .minecraft/config 配置文件' }
+        Write-Host "PCL 完整包验证通过：$($ModEntries.Count) 个实际模组 JAR 已装入 ZIP，$(@($Check.Entries).Count) 个压缩条目" -ForegroundColor Green
     } finally { $Check.Dispose() }
     Write-Host "构建完成：$PackZip" -ForegroundColor Green
     Write-Host "必需与自动依赖模组：$($IndexFiles.Count)；可选跳过：$($Warnings.Count)" -ForegroundColor Green
