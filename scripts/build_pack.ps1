@@ -147,22 +147,12 @@ try {
         if ($ModEntries.Count -eq 0) { throw 'ZIP 中没有实际模组 JAR 文件' }
         if (@($Check.Entries | Where-Object { $_.FullName -like '.minecraft/config/*' }).Count -eq 0) { throw 'ZIP 中缺少 .minecraft/config 配置文件' }
         Write-Host "PCL 完整包验证通过：$($ModEntries.Count) 个实际模组 JAR 已装入 ZIP，$(@($Check.Entries).Count) 个压缩条目" -ForegroundColor Green
-} catch {
-    Write-Host "构建失败：$($_.Exception.Message)" -ForegroundColor Red
-    Write-Host $_.ScriptStackTrace -ForegroundColor DarkYellow
-    exit 1
-} finally {
-    if (Test-Path $Stage) { Remove-Item $Stage -Recurse -Force }
-}
-})
-        if ($ModEntries.Count -ne $IndexFiles.Count) { throw "模组打包数量不一致：ZIP=$($ModEntries.Count)，解析=$($IndexFiles.Count)" }
-        if ($ModEntries.Count -eq 0) { throw 'ZIP 中没有实际模组 JAR 文件' }
-        if (@($Check.Entries | Where-Object {$_.FullName -like '.minecraft/config/*'}).Count -eq 0) { throw 'ZIP 中缺少 .minecraft/config 配置文件' }
-        Write-Host "PCL 完整包验证通过：$($ModEntries.Count) 个实际模组 JAR 已装入 ZIP，$(@($Check.Entries).Count) 个压缩条目" -ForegroundColor Green
-    } finally { $Check.Dispose() }
+    } finally {
+        $Check.Dispose()
+    }
     Write-Host "构建完成：$PackZip" -ForegroundColor Green
     Write-Host "必需与自动依赖模组：$($IndexFiles.Count)；可选跳过：$($Warnings.Count)" -ForegroundColor Green
-    Write-Host '将此 ZIP 直接拖入 PCL 导入；首次安装需要联网下载 Minecraft、Fabric 和模组。建议 Java 25 x64，内存先设为 5GB。' -ForegroundColor Yellow
+    Write-Host '将此 ZIP 直接拖入 PCL 导入；首次安装需要联网下载 Minecraft、Fabric 和运行库。建议 Java 25 x64，内存先设为 5GB。' -ForegroundColor Yellow
 } catch {
     Write-Host "构建失败：$($_.Exception.Message)" -ForegroundColor Red
     Write-Host $_.ScriptStackTrace -ForegroundColor DarkYellow
