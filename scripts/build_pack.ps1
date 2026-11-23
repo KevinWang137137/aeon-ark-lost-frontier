@@ -119,9 +119,9 @@ try {
         $Required = if ($null -ne $Pack.required) { [bool]$Pack.required } else { $false }
         Add-Datapack ([string]$Pack.project) ([string]$Pack.filename) $Dir $Required
     }
-    $Index = [ordered]@{formatVersion=1;game='minecraft';versionId=$PackVersion;name='方舟纪元：失落的世界';summary='Minecraft 26.3 Fabric · 标准生存 · 小岛开局 · 中文任务冒险';files=@($IndexFiles);dependencies=@{minecraft=$Game;'fabric-loader'=$LoaderVersion}}
+    $Index = [ordered]@{formatVersion=1;game='minecraft';versionId=$PackVersion;name='方舟纪元：失落的世界';summary='Minecraft 26.3 Fabric · 标准生存 · 小岛开局 · 中文任务冒险';files=$IndexFiles.ToArray();dependencies=@{minecraft=$Game;'fabric-loader'=$LoaderVersion}}
     [IO.File]::WriteAllText((Join-Path $Stage 'modrinth.index.json'),($Index | ConvertTo-Json -Depth 30),$Utf8)
-    $Report = [ordered]@{minecraft=$Game;loader=$Loader;loader_version=$LoaderVersion;resolved=$Resolved;warnings=@($Warnings)}
+    $Report = [ordered]@{minecraft=$Game;loader=$Loader;loader_version=$LoaderVersion;resolved=$Resolved;warnings=$Warnings.ToArray()}
     [IO.File]::WriteAllText((Join-Path $Overrides 'aeon-ark-mod-resolution-report.json'),($Report | ConvertTo-Json -Depth 30),$Utf8)
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $PackZip = Join-Path $Out "AeonArk-26.3-Fabric-v$PackVersion.zip"
@@ -145,6 +145,7 @@ try {
     Write-Host '将此 ZIP 直接拖入 PCL 导入；首次安装需要联网下载 Minecraft、Fabric 和模组。建议 Java 25 x64，内存先设为 5GB。' -ForegroundColor Yellow
 } catch {
     Write-Host "构建失败：$($_.Exception.Message)" -ForegroundColor Red
+    Write-Host $_.ScriptStackTrace -ForegroundColor DarkYellow
     exit 1
 } finally {
     if (Test-Path $Stage) { Remove-Item $Stage -Recurse -Force }
