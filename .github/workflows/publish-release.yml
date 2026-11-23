@@ -1,4 +1,4 @@
-name: Build Windows EXE and publish release
+name: Build PCL modpack ZIP and publish release
 
 on:
   push:
@@ -6,82 +6,66 @@ on:
     paths:
       - ".github/release-version.txt"
       - ".github/workflows/publish-release.yml"
+      - "scripts/**"
+      - "modpack_sources.json"
+      - "config/**"
+      - "global_packs/**"
+      - "quests/**"
+      - "quest_bundle/**"
+      - "pack_manifest.json"
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  build-windows-launcher:
+  build-and-release:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Install launcher dependencies
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build PCL-importable pack
+        shell: pwsh
         run: |
-          python -m pip install --upgrade pip
-          pip install -r launcher_app/requirements.txt
-      - name: Prepare launcher icon assets
-        run: |
-          python -c "import base64; from pathlib import Path; p=Path('launcher_app/assets'); (p/'aeon_ark_icon.jpg').write_bytes(base64.b64decode((p/'aeon_ark_icon.jpg.b64').read_text().strip(), validate=True))"
-          python -c "from PIL import Image; Image.open('launcher_app/assets/aeon_ark_icon.jpg').save('launcher_app/assets/aeon_ark_icon.ico', format='ICO', sizes=[(256,256),(128,128),(64,64),(48,48),(32,32),(16,16)])"
-      - name: Build standalone EXE
-        run: |
-          pyinstaller --noconfirm --clean --onefile --windowed --icon "launcher_app/assets/aeon_ark_icon.ico" --add-data "launcher_app/assets/aeon_ark_icon.ico;assets" --name AeonArkLauncher launcher_app/main.py
-          Copy-Item launcher_app/assets/aeon_ark_icon.ico dist/AeonArkLauncher.ico
-      - name: Upload launcher build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: AeonArkLauncher-Windows-EXE
-          path: |
-            dist/AeonArkLauncher.exe
-            dist/AeonArkLauncher.ico
-          if-no-files-found: error
-      - name: Prepare source archive
+          ./scripts/build_pack.ps1
+
+      - name: Read release version and verify single deliverable
         id: release
         shell: pwsh
         run: |
           $version = (Get-Content .github/release-version.txt -Raw).Trim()
           if ($version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') { throw "Invalid version: $version" }
-          New-Item -ItemType Directory -Force dist | Out-Null
-          git archive --format=zip --prefix="aeon-ark-lost-frontier-$version/" HEAD -o "dist/AeonArk-$version-Source.zip"
+          $pack = "release/AeonArk-26.3-Fabric-v$version.zip"
+          if (!(Test-Path $pack)) { throw "Pack ZIP not found: $pack" }
+          $files = @(Get-ChildItem release -File)
+          if ($files.Count -ne 1 -or $files[0].Name -ne (Split-Path $pack -Leaf)) {
+            throw "Release folder must contain exactly one deliverable ZIP."
+          }
           "version=$version" >> $env:GITHUB_OUTPUT
+          "pack=$pack" >> $env:GITHUB_OUTPUT
+
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.release.outputs.version }}
-          target_commitish: ${{ github.sha }}
-          name: Aeon Ark v${{ steps.release.outputs.version }} — EXE Launcher
+          tag_name: v\${{ steps.release.outputs.version }}
+          target_commitish: \${{ github.sha }}
+          name: Aeon Ark - The Lost Frontier v\${{ steps.release.outputs.version }}
           prerelease: true
           draft: false
           overwrite_files: true
-          files: |
-            dist/AeonArkLauncher.exe
-            dist/AeonArkLauncher.ico
-            dist/AeonArk-${{ steps.release.outputs.version }}-Source.zip
+          files: \${{ steps.release.outputs.pack }}
           body: |
-            # Aeon Ark: The Lost Frontier v${{ steps.release.outputs.version }}
+            # Aeon Ark: The Lost Frontier v\${{ steps.release.outputs.version }}
 
-            **Windows standalone EXE launcher.**
+            PCL 可直接导入的单 ZIP 整合包。
 
-            ## Downloads
-            - `AeonArkLauncher.exe` — single-file Windows application with the Aeon Ark app icon embedded.
-            - `AeonArkLauncher.ico` — standalone multi-size Windows icon.
-            - `Source.zip` — editable source code.
+            ## 安装
+            1. 下载本页唯一的 AeonArk-26.3-Fabric ZIP。
+            2. 将 ZIP 文件直接拖入 PCL 窗口，按提示创建独立游戏版本。
+            3. 首次安装需要联网；PCL 会根据 ZIP 内的 Modrinth 清单下载 Minecraft、Fabric 和模组。
+            4. 使用 Java 25 x64，建议先分配 5GB 内存。
+            5. 安装完成后创建新世界进行测试；不要用测试版覆盖已有存档。
 
-            ## Current functions
-            - Import `.mrpack` modpacks and ZIP packs containing `mods/`, `config/`, and `global_packs/`.
-            - Install each imported pack into its own isolated instance folder under `%APPDATA%\\AeonArkLauncher\\instances`.
-            - Display installed packs and open their instance folders.
-            - Create a desktop shortcut automatically on first launch; the shortcut uses the icon embedded in the EXE.
-            - Delete selected instances after confirmation; the full instance, including worlds and settings, is moved to the Windows Recycle Bin.
-            - The icon is embedded into the EXE and also used by the launcher window.
-
-            ## Preview limitation
-            - Microsoft/Xbox/Minecraft account sign-in and one-click game launch are not yet implemented.
-            - `.mrpack` installation uses minecraft-launcher-lib and downloads required Minecraft/loader/modpack files.
-            - First import requires internet. Use a test instance and back up existing worlds.
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            ZIP 根目录包含 modrinth.index.json，配置与任务数据位于 overrides/。
+            本版仍为预览版；世界出生点、任务计数和长时间稳定性需要实际游戏验收。
