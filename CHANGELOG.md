@@ -1,3 +1,15 @@
+# Changelog
+
+## 1.0.0 — 2026-11-25
+
+- First stable GitHub Release for Minecraft Java 26.3 + Fabric.
+- Build discovers compatible Modrinth projects and enforces at least 150 actual `.jar` files in the PCL ZIP.
+- Downloaded mod files are verified against Modrinth SHA-512 or SHA-1 hashes.
+- Added the AEON ARK title-logo resource pack and enabled it by default for fresh instances.
+- CI validates the MMC ZIP layout, actual JAR count, logo texture path and default resource-pack setting.
+- Published PCL-importable client ZIP: `AeonArk-26.3-Fabric-v1.0.0.zip`.
+- Remaining acceptance: live main-menu visual check, PCL import on the target PC, island spawn, in-game quest tracking and memory/stability testing.
+
 # 更新日志
 
 ## 0.2.0-alpha.3

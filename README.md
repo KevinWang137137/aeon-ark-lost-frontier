@@ -1,71 +1,50 @@
 # Aeon Ark: The Lost Frontier
 
-**方舟纪元：失落的世界** — an original Minecraft Java adventure modpack project.
+**方舟纪元：失落的世界** — a Minecraft Java adventure and exploration modpack.
 
-> Development snapshot: **v1.0.0** · Minecraft **26.3** · Fabric · Java 25
->
-> **Status: 1.0.0 stable release build; CI verifies the packaged deliverable, but manual in-game acceptance is still pending.** This repository does not claim to be a ready-to-play release.
+**v1.0.0 stable release**
 
-## Project direction
+- Minecraft Java **26.3**
+- Fabric Loader **0.20.1**
+- Java **25 x64**
+- PCL import format: **MMC instance ZIP**
+- Published pack: **150 actual mod JAR files**
+- Authored quests: **72 across 8 categories**
 
-A vanilla-inspired survival and exploration pack that begins on a small, isolated island. Players gradually explore new biomes and ruins, establish farms and workshops, discover arcane tools, recover the lost Ark civilization's archives, and eventually choose among multiple endings.
+## Download
 
-Design priorities:
+[Download AeonArk-26.3-Fabric-v1.0.0.zip](https://github.com/KevinWang137137/aeon-ark-lost-frontier/releases/download/v1.0.0/AeonArk-26.3-Fabric-v1.0.0.zip)
 
-- Dreamcraft-style special island start; standard Survival difficulty.
-- Chapter-based Chinese quest book, independent mod-focused quest lines, and converging story milestones.
-- New biomes, creatures, structures, food, machines and magic while keeping the visual style close to vanilla.
-- Few major boss encounters; exploration and collection are the main progression drivers.
-- Target memory allocation around 5 GB, subject to real-world testing.
+[Open the v1.0.0 release page](https://github.com/KevinWang137137/aeon-ark-lost-frontier/releases/tag/v1.0.0)
 
-## Current baseline
+The ZIP is a complete PCL-importable client instance. It contains the resolved mod JARs, config, quest data, global packs and AEON ARK title-logo resource pack. The release workflow counted **150 actual JARs inside the ZIP** and verified the downloaded Modrinth hashes before publishing.
 
-| Component | Target |
-|---|---|
-| Minecraft Java | 26.3 (latest stable line verified for this snapshot) |
-| Mod loader | Fabric Loader 0.20.1 |
-| Fabric API | 0.166.2+26.3 |
-| Java | 25 x64 |
-| Launcher target | PCL / PCL2 local-instance installation |
-| Current authored quests | 72 across 8 categories |
-| Long-term quest target | 360+ |
+## Install with PCL
 
-## Download the 1.0.0 PCL pack
+1. Download the ZIP from the release page.
+2. Drag the ZIP into PCL and import it as a **new, separate instance**.
+3. Keep the internet connection available on first install so PCL can install Minecraft, Fabric and runtime libraries.
+4. Select Java 25 x64. Start with 5 GB allocated memory; this is a starting point, not a verified performance guarantee.
+5. Create a new world for testing. Do not point the instance at an existing save.
 
-[Open the v0.2.0-alpha.3 GitHub pre-release](https://github.com/KevinWang137137/aeon-ark-lost-frontier/releases/tag/v0.2.0-alpha.3) and download **AeonArk-0.2.0-alpha.3-Source.zip**.
+## What is in the pack
 
-The bundle contains the authored quest data bundle, configuration, mod source list, Windows PowerShell build script, quest validator, and project notes. It **contains the third-party mod JARs resolved during the Windows CI build**. The build script resolves compatible files from Modrinth on a Windows machine and validates downloaded hashes. This is a source-only engineering preview, PCL-importable full client package.
+- Special isolated-island survival start, standard Survival difficulty.
+- Chinese chapter quest book with 72 authored quests in 8 categories.
+- Exploration, structures, creatures, food, industrial systems and magic.
+- AEON ARK title-logo resource pack, configured to be enabled by default in a fresh instance.
+- Modrinth dependency resolution and file-hash verification in the Windows build workflow.
 
-## Local validation
+## Verification boundary
 
-Run from the extracted project directory:
+**Verified by GitHub Actions:** 150 actual `.jar` files are present in the published ZIP; Modrinth hashes were checked during download; PCL MMC ZIP structure was checked; the title texture and resource-pack metadata are present; `options.txt` enables the title pack by default; quest data passes static validation.
 
-```powershell
-python scripts/validate_quests.py
-```
+**Still requires a real desktop game session:** visual confirmation of the title logo on the live main menu, PCL import on the target computer, island spawn validation, in-game quest objective checks, mod interaction/stability checks, and 5 GB memory performance. The title resource pack is packaged and auto-enabled, but this CI runner did not perform a manual visual inspection of the running game.
 
-This expands `quest-data/quests.json.gz.b64` when needed, then checks the quest JSON structure, supported objective/reward types and required fields, prerequisite references, and the 26.3 datapack metadata. It is a static check only; it does not prove that the game launches or that each objective registers in-game.
+## Development
 
-On Windows, run `Build_PCL整合包.bat`. The build first expands the tracked quest bundle using `scripts/expand_quest_bundle.ps1`, then to resolve/download the selected 26.3 Fabric mod files and build a local complete-files ZIP plus an `.mrpack` index. Use Java 25 x64 and test in a new PCL instance. The small-island seed is still a candidate and must be validated in-game.
+Run `python scripts/validate_quests.py` to validate the authored quest data.
 
-## Current verification boundary
+On Windows, `Build_PCL整合包.bat` builds the PCL instance ZIP. The build fails if it cannot resolve and verify at least 150 actual mod JARs for Minecraft 26.3 + Fabric.
 
-**Passed:** 72 quest files parse; 8 categories present; all quest prerequisites resolve; supported JustQuests fields pass static validation; archive integrity check passes.
-
-**Not yet performed:** Windows download/build execution, full dependency-resolution run, PCL import, Minecraft client launch, world creation, island spawn verification, per-quest in-game objective checks, and 5 GB performance/stability testing.
-
-See [`docs/技术核验记录.md`](docs/技术核验记录.md), [`docs/V0.2.0-alpha.3更新说明.md`](docs/V0.2.0-alpha.3更新说明.md), and [`CHANGELOG.md`](CHANGELOG.md).
-
----
-
-# 中文说明
-
-这是《方舟纪元：失落的世界》的正式开发仓库。当前是 **V0.2.0-alpha.3 工程预览版**，不是已通过客户端测试的可玩发行版。
-
-本次源代码包有 72 条原创任务、8 个任务分类、任务前置链、模组清单、PCL 本地构建脚本与静态校验脚本。目标为 Minecraft Java 26.3 + Fabric + Java 25，Dreamcraft 式特殊小岛开局、标准生存难度。
-
-本次会话附带的 PCL instance ZIP 解压后，请按 `README_先看这里.md` 操作。第三方模组 JAR 不随仓库重打包；Windows 构建脚本会从 Modrinth 官方项目记录下载并校验文件。启动、岛屿生成、任务实测和性能测试尚未完成。
-
-## 1.0.0 acceptance notes
-
-The Windows release build enforces at least 150 actual `.jar` files in the ZIP and verifies Modrinth hashes. The AEON ARK logo resource pack is included and configured as enabled in a fresh instance. The automated runner does not provide manual visual inspection of the live title screen; verify the main menu on first launch. World spawn, quest tracking and 5 GB memory performance still require in-game testing.
+The long-term quest target remains 360+ quests. See `CHANGELOG.md` and `docs/` for project history and technical notes.

@@ -1,45 +1,48 @@
 # 方舟纪元：失落的世界 — Aeon Ark: The Lost Frontier
 
-**当前开发版本：0.2.0-alpha.9（正式发行构建）**
+**正式发行版本：1.0.0**
 
-这是面向 Minecraft Java 26.3 + Fabric 的任务冒险整合包。发布时提供**一个完整客户端 ZIP**，实际模组 JAR 已经装在压缩包里，不是只给一份清单让 PCL 再逐个下载模组。
+- Minecraft Java：**26.3**
+- Fabric Loader：**0.20.1**
+- Java：**25 x64**
+- PCL 导入格式：**MMC 实例 ZIP**
+- 实际打包模组：**150 个 JAR**
+- 原创任务：**72 条，分为 8 个分类**
 
-## 当前配置
+## 下载
 
-- Minecraft Java：26.3
-- Fabric Loader：0.20.1
-- Java：25 x64
-- 建议内存：先分配 5GB
-- 玩法方向：小岛开局、章节任务、探索、农业、工业与魔法
-- 当前任务内容：72 条中文任务、8 个分类（持续扩展中）
+[下载完整 PCL 整合包 ZIP](https://github.com/KevinWang137137/aeon-ark-lost-frontier/releases/download/v1.0.0/AeonArk-26.3-Fabric-v1.0.0.zip)
 
-## PCL 安装
+[打开 GitHub v1.0.0 正式发行页面](https://github.com/KevinWang137137/aeon-ark-lost-frontier/releases/tag/v1.0.0)
 
-1. 从 GitHub Releases 下载唯一的 \`AeonArk-26.3-Fabric-v0.2.0-alpha.9.zip\`。
-2. 将 ZIP 直接拖入 PCL。
-3. PCL 识别 MMC 实例包后，按提示选择一个空的安装位置。
-4. ZIP 已包含实际模组 JAR、配置、任务与数据包；PCL 不需要逐个联网下载模组。
-5. PCL 仍可能需要获取 Minecraft/Fabric 本体及其运行库。首次安装请保持联网。
-6. 使用 Java 25 x64，建议分配 5GB 内存；创建新世界进行测试。
+这是完整客户端实例 ZIP，内含实际模组 JAR、配置、任务数据、Global Packs 和 AEON ARK 标题 Logo 资源包。GitHub 发布工作流确认 ZIP 内有 **150 个实际 JAR 文件**，并在发布前校验了 Modrinth 下载文件的哈希。
 
-## ZIP 内容
+## PCL 安装步骤
 
-压缩包根目录直接包含：
-- \`mmc-pack.json\` 与 \`instance.cfg\`：PCL 可识别的实例组件信息（Minecraft 26.3 + Fabric 0.20.1）。
-- \`.minecraft/mods/\`：本整合包实际使用的模组 JAR，构建时从 Modrinth 下载并校验哈希后放入 ZIP。
-- \`.minecraft/config/\`：模组配置。
-- \`.minecraft/global_packs/\`：任务与全局数据包。
-- 其他存在的资源包、光影包、默认配置和脚本目录。
+1. 从上方 Releases 页面下载 ZIP。
+2. 将 ZIP 直接拖入 PCL，导入为一个**全新的独立实例**。
+3. 首次安装时保持联网，让 PCL 下载 Minecraft、Fabric 和运行库。
+4. 选择 Java 25 x64。建议先分配 5GB 内存；这只是起始建议，不代表已经完成性能保证。
+5. 创建新世界测试。不要将该实例指向已有存档。
 
-这是完整客户端文件包，不是 Modrinth 在线下载清单。构建检查会核对 ZIP 内的实际 JAR 数量与解析出的模组数量。
+## 整合包内容
 
-## 当前验收状态
+- 特殊孤岛生存开局，标准生存难度。
+- 72 条原创中文章节任务，分为 8 个分类。
+- 探索、建筑结构、生物、食物、工业系统和魔法内容。
+- AEON ARK 标题 Logo 资源包，已配置为新实例默认启用。
+- Windows 构建工作流自动解析 Modrinth 依赖并校验文件哈希。
 
-预览版尚需真实 PCL 导入与游戏内验收。重点检查：PCL 是否识别 MMC 包、Fabric 是否成功安装、所有模组是否加载、任务目标是否计数、世界生成与长时间稳定性。
+## 验收边界
 
-如果启动失败，请提供 PCL 错误信息和实例目录 \`logs/latest.log\`。
+**GitHub Actions 已自动验证：** 发布 ZIP 内有 150 个实际 `.jar`；下载时校验了 Modrinth 文件哈希；PCL MMC ZIP 结构通过检查；标题纹理和资源包元数据存在；`options.txt` 已启用标题资源包；任务数据静态校验通过。
 
+**仍需真实桌面游戏环境确认：** 启动后的主菜单标题图视觉效果、目标电脑上的 PCL 导入、孤岛出生点、游戏内任务计数、模组之间的运行稳定性，以及 5GB 内存表现。标题资源包已打包并配置自动启用，但当前 CI 环境没有人工查看正在运行的游戏画面。
 
-## 1.0.0 正式版验收说明
+## 本地开发
 
-构建工作流会强制检查至少 150 个实际 JAR、Modrinth 文件哈希、PCL ZIP 结构，以及 AEON ARK 标题资源包的文件路径和默认启用设置。标题图片已打包并配置自动启用，但尚未由人工在真实客户端画面中确认；首次启动请检查主菜单。出生点、任务计数和 5GB 内存表现仍需实机测试。
+运行 `python scripts/validate_quests.py` 可检查原创任务数据。
+
+Windows 下运行 `Build_PCL整合包.bat` 可构建 PCL 实例 ZIP。如果无法为 Minecraft 26.3 + Fabric 解析并验证至少 150 个实际模组 JAR，构建会直接失败。
+
+长期任务目标仍为 360+ 条。项目历史和技术记录见 `CHANGELOG.md` 与 `docs/`。
