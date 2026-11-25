@@ -135,6 +135,8 @@ try {
     $Report = [ordered]@{minecraft=$Game;loader=$Loader;loader_version=$LoaderVersion;resolved=$Resolved;warnings=$Warnings.ToArray()}
     [IO.File]::WriteAllText((Join-Path $GameRoot 'aeon-ark-mod-resolution-report.json'),($Report | ConvertTo-Json -Depth 30),$Utf8)
     Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $MinimumMods = 150
+    if ($IndexFiles.Count -lt $MinimumMods) { throw "实际解析到 $($IndexFiles.Count) 个模组 JAR，未达到正式版最低要求 $MinimumMods；拒绝生成不达标 ZIP。" }
     $PackZip = Join-Path $Out "AeonArk-26.3-Fabric-v$PackVersion.zip"
     if (Test-Path $PackZip) { Remove-Item $PackZip -Force }
     # PCL recognises this as an MMC instance ZIP; actual mod JARs are bundled under .minecraft/mods.
@@ -144,6 +146,7 @@ try {
         if ($null -eq $Check.GetEntry('mmc-pack.json') -or $null -eq $Check.GetEntry('instance.cfg')) { throw 'ZIP 根目录缺少 PCL 可识别的 MMC 整合包文件' }
         $ModEntries = @($Check.Entries | Where-Object { $_.FullName -match '^\.minecraft/mods/[^/]+\.jar$' })
         if ($ModEntries.Count -ne $IndexFiles.Count) { throw "模组打包数量不一致：ZIP=$($ModEntries.Count)，解析=$($IndexFiles.Count)" }
+        if ($ModEntries.Count -lt 150) { throw "ZIP 实际只有 $($ModEntries.Count) 个模组 JAR，少于正式版最低要求 150 个" }
         if ($ModEntries.Count -eq 0) { throw 'ZIP 中没有实际模组 JAR 文件' }
         if (@($Check.Entries | Where-Object { $_.FullName -like '.minecraft/config/*' }).Count -eq 0) { throw 'ZIP 中缺少 .minecraft/config 配置文件' }
         Write-Host "PCL 完整包验证通过：$($ModEntries.Count) 个实际模组 JAR 已装入 ZIP，$(@($Check.Entries).Count) 个压缩条目" -ForegroundColor Green

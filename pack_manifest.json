@@ -1,7 +1,7 @@
 {
   "project": "方舟纪元：失落的世界",
   "english": "Aeon Ark: The Lost Frontier",
-  "build": "0.2.0-alpha.9",
+  "build": "1.0.0",
   "minecraft": "26.3",
   "loader": "Fabric",
   "fabric_loader": "0.20.1",
@@ -10,23 +10,24 @@
   "difficulty": "标准生存",
   "starting_style": "Dreamcraft式特殊小岛开局（候选种子，尚未游戏内验证）",
   "seed_candidate": "3404544535694295634",
-  "spawn_candidate": {
-    "x": 704,
-    "z": 64,
-    "surface_y": 78,
-    "verified": false
-  },
+  "spawn_candidate": {"x": 704, "z": 64, "surface_y": 78, "verified": false},
   "memory_target_gb": 5,
-  "quests": {
-    "implemented": 72,
-    "categories": 8,
-    "planned_total": 360
-  },
-  "status": "预览版；PCL Modrinth ZIP 构建流程已接入，仍待实际导入、客户端启动和游戏内验收",
+  "quests": {"implemented": 72, "categories": 8, "planned_total": 360},
+  "status": "正式版构建准备中；模组数量、客户端启动与游戏内功能尚未验收",
   "third_party_mod_jars_in_repository": false,
   "worldgen": {
     "biome_pack": "Terralith 2.6.5+26.3",
     "enabled_by_default": false,
     "reason": "先保证特殊小岛出生点不受未经验证的世界生成改动影响"
+  },
+  "mod_count_target": {
+    "minimum": 150,
+    "counting": "实际装入 .minecraft/mods 的 JAR，包含自动解析依赖",
+    "verified": false
+  },
+  "title_screen": {
+    "logo_text": "AEON ARK",
+    "implementation": "resource pack override of assets/minecraft/textures/gui/title/minecraft.png",
+    "verified_in_game": false
   }
 }

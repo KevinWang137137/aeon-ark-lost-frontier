@@ -12,7 +12,8 @@
     {"project":"LiazpLjr","purpose":"Spellgems法术宝石和法杖"},
     {"project":"nemos-creatures","purpose":"新增生物与群系专属生物"},
     {"project":"repurposed-structures-fabric","purpose":"原版风格结构变体"},
-    {"project":"jei","purpose":"物品与合成配方查询"}
+    {"project":"jei","purpose":"物品与合成配方查询"},
+    {"project":"jade","purpose":"Jade 方块、实体与容器信息 HUD"}
   ],
   "optional_mods": [
     {"project":"living-things","purpose":"额外野生动物（兼容性检查通过才加入）"},
