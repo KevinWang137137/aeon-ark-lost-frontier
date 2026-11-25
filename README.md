@@ -41,6 +41,10 @@ The ZIP is a complete PCL-importable client instance. It contains the resolved m
 
 **Still requires a real desktop game session:** visual confirmation of the title logo on the live main menu, PCL import on the target computer, island spawn validation, in-game quest objective checks, mod interaction/stability checks, and 5 GB memory performance. The title resource pack is packaged and auto-enabled, but this CI runner did not perform a manual visual inspection of the running game.
 
+## License
+
+Original Aeon Ark content (original quest text, project-authored configs, scripts, documentation, artwork and logos) is **All Rights Reserved**. Personal gameplay use of the compiled modpack is permitted; redistribution or derivative use of original project materials requires prior written permission. This does not change the separate licenses and distribution terms of Minecraft, Fabric, or any third-party mods and assets. See [LICENSE](LICENSE).
+
 ## Development
 
 Run `python scripts/validate_quests.py` to validate the authored quest data.
