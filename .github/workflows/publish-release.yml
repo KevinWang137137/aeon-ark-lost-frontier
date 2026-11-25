@@ -50,10 +50,24 @@ jobs:
             try { $optionText = $reader.ReadToEnd() } finally { $reader.Dispose() }
             if ($optionText -notmatch 'file/AeonArk_Title_Logo') { throw "Title logo is not configured as enabled." }
           } finally { $zip.Dispose() }
+          $mrpack = "release/AeonArk-26.3-Fabric-v$version.mrpack"
+          if (!(Test-Path $mrpack)) { throw "Modrinth pack not found: $mrpack" }
+          $mr = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path $mrpack))
+          try {
+            $indexEntry = $mr.GetEntry("modrinth.index.json")
+            if ($null -eq $indexEntry) { throw "MRPACK index missing." }
+            $reader = [System.IO.StreamReader]::new($indexEntry.Open())
+            try { $index = $reader.ReadToEnd() | ConvertFrom-Json } finally { $reader.Dispose() }
+            if ($index.formatVersion -ne 1 -or $index.game -ne "minecraft") { throw "Invalid Modrinth index." }
+            if ($index.dependencies.minecraft -ne "26.3" -or $index.dependencies."fabric-loader" -ne "0.20.1") { throw "MRPACK dependency versions mismatch." }
+            if (@($index.files).Count -lt 150) { throw "MRPACK has fewer than 150 mod references." }
+            if ($null -eq $mr.GetEntry("overrides/resourcepacks/AeonArk_Title_Logo/pack.mcmeta")) { throw "MRPACK title resource pack missing." }
+          } finally { $mr.Dispose() }
           $files = @(Get-ChildItem release -File)
-          if ($files.Count -ne 1 -or $files[0].Name -ne (Split-Path $pack -Leaf)) { throw "Release folder must contain exactly one deliverable ZIP." }
+          if ($files.Count -ne 2 -or !(Test-Path $pack) -or !(Test-Path $mrpack)) { throw "Release folder must contain exactly the PCL ZIP and Modrinth MRPACK." }
           "version=$version" >> $env:GITHUB_OUTPUT
           "pack=$pack" >> $env:GITHUB_OUTPUT
+          "mrpack=$mrpack" >> $env:GITHUB_OUTPUT
           "jar_count=$($mods.Count)" >> $env:GITHUB_OUTPUT
 
       - name: Publish GitHub stable release
@@ -66,20 +80,22 @@ jobs:
           draft: false
           overwrite_files: true
           make_latest: true
-          files: ${{ steps.release.outputs.pack }}
+          files: |
+            ${{ steps.release.outputs.pack }}
+            ${{ steps.release.outputs.mrpack }}
           body: |
             # Aeon Ark: The Lost Frontier v1.0.0
 
-            **正式发行版 · Minecraft Java 26.3 · Fabric · PCL ZIP**
+            **正式发行版 · Minecraft Java 26.3 · Fabric · PCL ZIP + Modrinth MRPACK**
 
             ## 本版验收
             - Windows CI 从 Modrinth 按 Minecraft 26.3 + Fabric 条件自动发现模组与依赖。
             - 至少 150 个实际 .jar 已下载、逐个哈希校验，并确认真实装入发布 ZIP。
             - 发布包内含 AEON ARK 标题 Logo 资源包，options.txt 已配置在新实例中默认启用。
-            - ZIP 结构、模组数量、标题纹理路径和默认启用配置均由发布工作流强制检查。
+            - PCL ZIP 与 Modrinth MRPACK 双格式均由发布工作流构建和检查；MRPACK 使用 Modrinth 文件 CDN URL 与 SHA 哈希引用模组，配置和资源包放入 overrides。
 
             ## 安装
-            1. 下载本页唯一的 AeonArk-26.3-Fabric-v1.0.0.zip。
+            1. PCL 用户下载 AeonArk-26.3-Fabric-v1.0.0.zip；Modrinth 发布使用同版本 .mrpack 文件。
             2. 将 ZIP 拖入 PCL，导入为独立实例。
             3. 首次安装保持联网，让 PCL 安装 Minecraft/Fabric 本体和运行库。
             4. 使用 Java 25 x64；内存建议先分配 5GB。
