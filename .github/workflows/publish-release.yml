@@ -10,6 +10,7 @@ on:
       - "modpack_sources.json"
       - "config/**"
       - "global_packs/**"
+      - "resourcepacks/**"
       - "quests/**"
       - "quest_bundle/**"
       - "pack_manifest.json"
@@ -27,45 +28,62 @@ jobs:
 
       - name: Build PCL-importable pack
         shell: pwsh
-        run: |
-          ./scripts/build_pack.ps1
+        run: ./scripts/build_pack.ps1
 
-      - name: Read release version and verify single deliverable
+      - name: Verify release deliverable
         id: release
         shell: pwsh
         run: |
           $version = (Get-Content .github/release-version.txt -Raw).Trim()
-          if ($version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') { throw "Invalid version: $version" }
+          if ($version -ne '1.0.0') { throw "Expected release version 1.0.0, got $version" }
           $pack = "release/AeonArk-26.3-Fabric-v$version.zip"
           if (!(Test-Path $pack)) { throw "Pack ZIP not found: $pack" }
+          $zip = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path $pack))
+          try {
+            $mods = @($zip.Entries | Where-Object { $_.FullName -match '^\.minecraft/mods/[^/]+\.jar$' })
+            if ($mods.Count -lt 150) { throw "Only $($mods.Count) actual JARs in release ZIP; minimum is 150." }
+            if ($null -eq $zip.GetEntry('.minecraft/resourcepacks/AeonArk_Title_Logo/assets/minecraft/textures/gui/title/minecraft.png')) { throw "AEON ARK title texture missing." }
+            if ($null -eq $zip.GetEntry('.minecraft/resourcepacks/AeonArk_Title_Logo/pack.mcmeta')) { throw "Title resource-pack metadata missing." }
+            $options = $zip.GetEntry('.minecraft/options.txt')
+            if ($null -eq $options) { throw "options.txt missing." }
+            $reader = [System.IO.StreamReader]::new($options.Open())
+            try { $optionText = $reader.ReadToEnd() } finally { $reader.Dispose() }
+            if ($optionText -notmatch 'file/AeonArk_Title_Logo') { throw "Title logo is not configured as enabled." }
+          } finally { $zip.Dispose() }
           $files = @(Get-ChildItem release -File)
-          if ($files.Count -ne 1 -or $files[0].Name -ne (Split-Path $pack -Leaf)) {
-            throw "Release folder must contain exactly one deliverable ZIP."
-          }
+          if ($files.Count -ne 1 -or $files[0].Name -ne (Split-Path $pack -Leaf)) { throw "Release folder must contain exactly one deliverable ZIP." }
           "version=$version" >> $env:GITHUB_OUTPUT
           "pack=$pack" >> $env:GITHUB_OUTPUT
+          "jar_count=$($mods.Count)" >> $env:GITHUB_OUTPUT
 
-      - name: Publish GitHub release
+      - name: Publish GitHub stable release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.release.outputs.version }}
           target_commitish: ${{ github.sha }}
           name: Aeon Ark - The Lost Frontier v${{ steps.release.outputs.version }}
-          prerelease: true
+          prerelease: false
           draft: false
           overwrite_files: true
+          make_latest: true
           files: ${{ steps.release.outputs.pack }}
           body: |
-            # Aeon Ark: The Lost Frontier v${{ steps.release.outputs.version }}
+            # Aeon Ark: The Lost Frontier v1.0.0
 
-            PCL 可直接导入的单 ZIP 整合包。
+            **正式发行版 · Minecraft Java 26.3 · Fabric · PCL ZIP**
+
+            ## 本版验收
+            - Windows CI 从 Modrinth 按 Minecraft 26.3 + Fabric 条件自动发现模组与依赖。
+            - 至少 150 个实际 .jar 已下载、逐个哈希校验，并确认真实装入发布 ZIP。
+            - 发布包内含 AEON ARK 标题 Logo 资源包，options.txt 已配置在新实例中默认启用。
+            - ZIP 结构、模组数量、标题纹理路径和默认启用配置均由发布工作流强制检查。
 
             ## 安装
-            1. 下载本页唯一的 AeonArk-26.3-Fabric ZIP。
-            2. 将 ZIP 文件直接拖入 PCL 窗口，按提示创建独立游戏版本。
-            3. 首次安装需要联网；ZIP 已内置所有实际模组 JAR、配置、任务和数据包；PCL 仅需按 MMC 组件信息安装 Minecraft/Fabric 本体与运行库。
-            4. 使用 Java 25 x64，建议先分配 5GB 内存。
-            5. 安装完成后创建新世界进行测试；不要用测试版覆盖已有存档。
+            1. 下载本页唯一的 AeonArk-26.3-Fabric-v1.0.0.zip。
+            2. 将 ZIP 拖入 PCL，导入为独立实例。
+            3. 首次安装保持联网，让 PCL 安装 Minecraft/Fabric 本体和运行库。
+            4. 使用 Java 25 x64；内存建议先分配 5GB。
+            5. 创建新世界测试，不要覆盖已有存档。
 
-            ZIP 根目录包含 mmc-pack.json 与 instance.cfg；完整客户端内容位于 .minecraft/，实际模组 JAR 已打包，不需要逐个下载。
-            本版仍为预览版；世界出生点、任务计数和长时间稳定性需要实际游戏验收。
+            ## 验证边界
+            自动化已验证实际 JAR 数量、下载哈希、ZIP 内容和标题资源包默认启用配置。当前自动化环境未完成真实桌面客户端的人工视觉验收；标题 Logo 已按 Minecraft 26.3 资源包格式打包，但请在首次启动后确认主菜单显示效果。150 个模组的内存占用和模组间运行稳定性仍需在目标电脑上实测.

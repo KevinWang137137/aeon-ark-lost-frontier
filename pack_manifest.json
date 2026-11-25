@@ -1,7 +1,7 @@
 {
   "project": "方舟纪元：失落的世界",
   "english": "Aeon Ark: The Lost Frontier",
-  "build": "0.2.0-alpha.9",
+  "build": "1.0.0",
   "minecraft": "26.3",
   "loader": "Fabric",
   "fabric_loader": "0.20.1",
@@ -22,11 +22,18 @@
     "categories": 8,
     "planned_total": 360
   },
-  "status": "预览版；PCL Modrinth ZIP 构建流程已接入，仍待实际导入、客户端启动和游戏内验收",
+  "status": "1.0.0 stable build target; CI requires at least 150 actual JARs and verifies hashes, PCL ZIP structure and title resource pack default-enable setting; client visual verification, island spawn and performance remain untested",
   "third_party_mod_jars_in_repository": false,
   "worldgen": {
     "biome_pack": "Terralith 2.6.5+26.3",
     "enabled_by_default": false,
     "reason": "先保证特殊小岛出生点不受未经验证的世界生成改动影响"
+  },
+  "minimum_mod_count": 150,
+  "title_logo": {
+    "resource_pack": "AeonArk_Title_Logo",
+    "texture": "assets/minecraft/textures/gui/title/minecraft.png",
+    "default_enabled": true,
+    "in_game_visual_verification": false
   }
 }

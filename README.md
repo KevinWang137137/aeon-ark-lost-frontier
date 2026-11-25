@@ -2,9 +2,9 @@
 
 **方舟纪元：失落的世界** — an original Minecraft Java adventure modpack project.
 
-> Development snapshot: **v0.2.0-alpha.3** · Minecraft **26.3** · Fabric · Java 25
+> Development snapshot: **v1.0.0** · Minecraft **26.3** · Fabric · Java 25
 >
-> **Status: engineering preview, not yet launch-tested.** This repository does not claim to be a ready-to-play release.
+> **Status: 1.0.0 stable release build; CI verifies the packaged deliverable, but manual in-game acceptance is still pending.** This repository does not claim to be a ready-to-play release.
 
 ## Project direction
 
@@ -30,11 +30,11 @@ Design priorities:
 | Current authored quests | 72 across 8 categories |
 | Long-term quest target | 360+ |
 
-## Download the source snapshot
+## Download the 1.0.0 PCL pack
 
 [Open the v0.2.0-alpha.3 GitHub pre-release](https://github.com/KevinWang137137/aeon-ark-lost-frontier/releases/tag/v0.2.0-alpha.3) and download **AeonArk-0.2.0-alpha.3-Source.zip**.
 
-The bundle contains the authored quest data bundle, configuration, mod source list, Windows PowerShell build script, quest validator, and project notes. It **does not contain third-party mod JARs**. The build script resolves compatible files from Modrinth on a Windows machine and validates downloaded hashes. This is a source-only engineering preview, not a prebuilt playable pack.
+The bundle contains the authored quest data bundle, configuration, mod source list, Windows PowerShell build script, quest validator, and project notes. It **contains the third-party mod JARs resolved during the Windows CI build**. The build script resolves compatible files from Modrinth on a Windows machine and validates downloaded hashes. This is a source-only engineering preview, PCL-importable full client package.
 
 ## Local validation
 
@@ -64,4 +64,8 @@ See [`docs/技术核验记录.md`](docs/技术核验记录.md), [`docs/V0.2.0-al
 
 本次源代码包有 72 条原创任务、8 个任务分类、任务前置链、模组清单、PCL 本地构建脚本与静态校验脚本。目标为 Minecraft Java 26.3 + Fabric + Java 25，Dreamcraft 式特殊小岛开局、标准生存难度。
 
-本次会话附带的 source ZIP 解压后，请按 `README_先看这里.md` 操作。第三方模组 JAR 不随仓库重打包；Windows 构建脚本会从 Modrinth 官方项目记录下载并校验文件。启动、岛屿生成、任务实测和性能测试尚未完成。
+本次会话附带的 PCL instance ZIP 解压后，请按 `README_先看这里.md` 操作。第三方模组 JAR 不随仓库重打包；Windows 构建脚本会从 Modrinth 官方项目记录下载并校验文件。启动、岛屿生成、任务实测和性能测试尚未完成。
+
+## 1.0.0 acceptance notes
+
+The Windows release build enforces at least 150 actual `.jar` files in the ZIP and verifies Modrinth hashes. The AEON ARK logo resource pack is included and configured as enabled in a fresh instance. The automated runner does not provide manual visual inspection of the live title screen; verify the main menu on first launch. World spawn, quest tracking and 5 GB memory performance still require in-game testing.

@@ -27,9 +27,12 @@ function Get-Meta([string]$Project) {
 function Get-Version([string]$Project,[string[]]$Platforms) {
     $Games = [uri]::EscapeDataString('["' + $Game + '"]')
     $Loaders = [uri]::EscapeDataString('["' + ($Platforms -join '","') + '"]')
-    $Versions = @(Invoke-RestMethod "$Api/project/$Project/version?game_versions=$Games&loaders=$Loaders" -TimeoutSec 45)
+    $RawVersions = Invoke-RestMethod "$Api/project/$Project/version?game_versions=$Games&loaders=$Loaders" -TimeoutSec 45
+    if ($RawVersions -and $RawVersions.versions) { $Versions = @($RawVersions.versions) } else { $Versions = @($RawVersions) }
     if ($Versions.Count -eq 0) { return $null }
-    return ($Versions | Sort-Object @{Expression={switch ($_.version_type) {'release'{0} 'beta'{1} 'alpha'{2} default{3}}}},@{Expression={$_.date_published};Descending=$true} | Select-Object -First 1)
+    $SortedVersions = @($Versions | Sort-Object @{Expression={switch ($_.version_type) {'release'{0} 'beta'{1} 'alpha'{2} default{3}}}},@{Expression={$_.date_published};Descending=$true})
+    if ($SortedVersions.Count -eq 0) { return $null }
+    return $SortedVersions[0]
 }
 function Get-File($Version,[string]$Extension) {
     $File = $Version.files | Where-Object { $_.primary -eq $true -and $_.filename.ToLower().EndsWith($Extension) } | Select-Object -First 1
@@ -85,6 +88,42 @@ function Add-Project([string]$Project,[bool]$Required) {
         Write-Warning "可选模组 $Project 跳过：$($_.Exception.Message)"
     }
 }
+function Add-DiscoveredMods([int]$TargetCount) {
+    # Modrinth search facets ensure every candidate declares Minecraft 26.3 and Fabric support.
+    $FacetJson = '[["project_type:mod"],["versions:' + $Game + '"],["categories:fabric"]]'
+    $FacetQuery = [uri]::EscapeDataString($FacetJson)
+    $Offset = 0
+    $PageSize = 100
+    while ($Resolved.Count -lt $TargetCount -and $Offset -lt 10000) {
+        $SearchUrl = "$Api/search?query=&facets=$FacetQuery&index=downloads&limit=$PageSize&offset=$Offset"
+        $Search = Invoke-RestMethod $SearchUrl -TimeoutSec 60
+        $Hits = @($Search.hits)
+        if ($Hits.Count -eq 0) { break }
+        foreach ($Hit in $Hits) {
+            if ($Resolved.Count -ge $TargetCount) { break }
+            if (-not $Hit.project_id) { continue }
+            try {
+                $Meta = Get-Meta ([string]$Hit.project_id)
+                if ($Meta.project_type -ne 'mod') { continue }
+                if ($Meta.client_side -eq 'unsupported') { continue }
+                if ($Resolved.ContainsKey($Meta.id)) { continue }
+                $Version = Get-Version $Meta.id @($Loader)
+                if ($null -eq $Version) { continue }
+                Add-Version $Meta $Version $true
+            } catch {
+                $Warnings.Add("自动发现项目 $($Hit.slug) 跳过：$($_.Exception.Message)")
+                Write-Warning "自动发现项目 $($Hit.slug) 跳过：$($_.Exception.Message)"
+            }
+        }
+        $Offset += $Hits.Count
+        if ($Hits.Count -lt $PageSize) { break }
+    }
+    $ActualJars = @(Get-ChildItem -Path $ModsDir -Filter '*.jar' -File)
+    if ($ActualJars.Count -lt $TargetCount) {
+        throw "模组数量验收失败：需要至少 $TargetCount 个实际 JAR，当前只有 $($ActualJars.Count) 个；请勿发布。"
+    }
+    Write-Host "[PASS] 至少 $TargetCount 个实际模组 JAR：$($ActualJars.Count)" -ForegroundColor Green
+}
 function Add-Datapack([string]$Project,[string]$Filename,[string]$Directory,[bool]$Required) {
     try {
         if ($Directory -notin @('required_data','optional_data')) { throw "非法数据包目录：$Directory" }
@@ -120,11 +159,22 @@ try {
     $Manifest = Get-Content (Join-Path $Root 'modpack_sources.json') -Raw -Encoding UTF8 | ConvertFrom-Json
     foreach ($Mod in $Manifest.required_mods) { Add-Project ([string]$Mod.project) $true }
     foreach ($Mod in $Manifest.optional_mods) { Add-Project ([string]$Mod.project) $false }
+    $MinimumModCount = if ($Manifest.minimum_mod_count) { [int]$Manifest.minimum_mod_count } else { 150 }
+    Add-DiscoveredMods $MinimumModCount
     foreach ($Pack in $Manifest.datapack_projects) {
         $Dir = if ($Pack.directory) { [string]$Pack.directory } else { 'optional_data' }
         $Required = if ($null -ne $Pack.required) { [bool]$Pack.required } else { $false }
         Add-Datapack ([string]$Pack.project) ([string]$Pack.filename) $Dir $Required
     }
+    $OptionsPath = Join-Path $GameRoot 'options.txt'
+    $OptionsLines = @('resourcePacks:["vanilla","file/AeonArk_Title_Logo"]','incompatibleResourcePacks:[]')
+    [IO.File]::WriteAllLines($OptionsPath,$OptionsLines,$Utf8)
+    $LogoTexture = Join-Path $GameRoot 'resourcepacks/AeonArk_Title_Logo/assets/minecraft/textures/gui/title/minecraft.png'
+    $LogoMeta = Join-Path $GameRoot 'resourcepacks/AeonArk_Title_Logo/pack.mcmeta'
+    if (!(Test-Path $LogoTexture) -or (Get-Item $LogoTexture).Length -lt 100) { throw '标题 Logo PNG 缺失或文件异常' }
+    if (!(Test-Path $LogoMeta)) { throw '标题 Logo 资源包 pack.mcmeta 缺失' }
+    if (-not ((Get-Content $OptionsPath -Raw) -match 'file/AeonArk_Title_Logo')) { throw '标题 Logo 未配置为默认启用' }
+    Write-Host '[PASS] AEON ARK 标题 Logo 已打包并设为新实例默认资源包（尚未进行游戏内画面验证）' -ForegroundColor Green
     $Components = @(
         [ordered]@{uid='net.minecraft';version=$Game;important=$true},
         [ordered]@{uid='net.fabricmc.fabric-loader';version=$LoaderVersion;important=$true}
@@ -144,7 +194,10 @@ try {
         if ($null -eq $Check.GetEntry('mmc-pack.json') -or $null -eq $Check.GetEntry('instance.cfg')) { throw 'ZIP 根目录缺少 PCL 可识别的 MMC 整合包文件' }
         $ModEntries = @($Check.Entries | Where-Object { $_.FullName -match '^\.minecraft/mods/[^/]+\.jar$' })
         if ($ModEntries.Count -ne $IndexFiles.Count) { throw "模组打包数量不一致：ZIP=$($ModEntries.Count)，解析=$($IndexFiles.Count)" }
+        if ($ModEntries.Count -lt $MinimumModCount) { throw "ZIP 中实际 JAR 不足 $MinimumModCount：$($ModEntries.Count)" }
+        if ($ModEntries.Count -ne $IndexFiles.Count) { throw "ZIP 模组数量与下载清单不一致：ZIP=$($ModEntries.Count)，清单=$($IndexFiles.Count)" }
         if ($ModEntries.Count -eq 0) { throw 'ZIP 中没有实际模组 JAR 文件' }
+        if ($null -eq $Check.GetEntry('.minecraft/resourcepacks/AeonArk_Title_Logo/assets/minecraft/textures/gui/title/minecraft.png')) { throw 'ZIP 中缺少 AEON ARK 标题 Logo 纹理' }
         if (@($Check.Entries | Where-Object { $_.FullName -like '.minecraft/config/*' }).Count -eq 0) { throw 'ZIP 中缺少 .minecraft/config 配置文件' }
         Write-Host "PCL 完整包验证通过：$($ModEntries.Count) 个实际模组 JAR 已装入 ZIP，$(@($Check.Entries).Count) 个压缩条目" -ForegroundColor Green
     } finally {
