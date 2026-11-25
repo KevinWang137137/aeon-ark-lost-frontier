@@ -60,7 +60,7 @@ function Add-Version($Meta,$Version,[bool]$Optional = $false) {
     $Client = if ($Meta.client_side -eq 'unsupported') { 'unsupported' } elseif ($Optional) { 'optional' } elseif ($Meta.client_side) { $Meta.client_side } else { 'required' }
     $Server = if ($Meta.server_side -eq 'unsupported') { 'unsupported' } elseif ($Optional) { 'optional' } elseif ($Meta.server_side) { $Meta.server_side } else { 'required' }
     Download-Verified $File (Join-Path $ModsDir $File.filename)
-    $IndexFiles.Add([ordered]@{filename=$File.filename;version=$Version.version_number;project=$Meta.id;sha1=$File.hashes.sha1;sha512=$File.hashes.sha512;size=[long]$File.size})
+    $IndexFiles.Add([ordered]@{filename=$File.filename;version=$Version.version_number;project=$Meta.id;version_id=$Version.id;url=$File.url;sha1=$File.hashes.sha1;sha512=$File.hashes.sha512;size=[long]$File.size;client=$Client;server=$Server})
     $Resolved[$Meta.id] = @{name=$Meta.title;version=$Version.version_number;filename=$File.filename;version_id=$Version.id}
     Write-Host "[MOD] $($Meta.title) -> $($Version.version_number)" -ForegroundColor Green
     foreach ($Dep in @($Version.dependencies)) {
@@ -200,6 +200,40 @@ try {
     } finally {
         $Check.Dispose()
     }
+    # Build a standards-compliant Modrinth .mrpack alongside the PCL/MMC ZIP.
+    # Mod files are referenced by immutable CDN URLs and hashes; only instance configs/packs go in overrides.
+    $MrStage = Join-Path $Root '.build_modrinth_pack'
+    if (Test-Path $MrStage) { Remove-Item $MrStage -Recurse -Force }
+    New-Item -ItemType Directory -Force -Path (Join-Path $MrStage 'overrides') | Out-Null
+    $MrFiles = foreach ($Entry in $IndexFiles) {
+        $Hashes = [ordered]@{}
+        if ($Entry.sha1) { $Hashes.sha1 = $Entry.sha1 }
+        if ($Entry.sha512) { $Hashes.sha512 = $Entry.sha512 }
+        [ordered]@{path="mods/$($Entry.filename)";hashes=$Hashes;env=[ordered]@{client=$Entry.client;server=$Entry.server};downloads=@($Entry.url);fileSize=[long]$Entry.size}
+    }
+    $MrIndex = [ordered]@{formatVersion=1;game='minecraft';versionId=$PackVersion;name='Aeon Ark: The Lost Frontier';summary='方舟纪元：失落的世界 - Minecraft 26.3 Fabric adventure and exploration modpack.';files=@($MrFiles);dependencies=[ordered]@{minecraft=$Game;'fabric-loader'=$LoaderVersion}}
+    [IO.File]::WriteAllText((Join-Path $MrStage 'modrinth.index.json'),($MrIndex | ConvertTo-Json -Depth 20),$Utf8)
+    foreach ($Folder in @('config','global_packs','resourcepacks','shaderpacks','defaultconfigs','kubejs','scripts')) {
+        $Source = Join-Path $GameRoot $Folder
+        if (Test-Path $Source) { Copy-Item $Source (Join-Path $MrStage "overrides/$Folder") -Recurse -Force }
+    }
+    if (Test-Path $OptionsPath) { Copy-Item $OptionsPath (Join-Path $MrStage 'overrides/options.txt') -Force }
+    $MrPack = Join-Path $Out "AeonArk-26.3-Fabric-v$PackVersion.mrpack"
+    if (Test-Path $MrPack) { Remove-Item $MrPack -Force }
+    [IO.Compression.ZipFile]::CreateFromDirectory($MrStage,$MrPack,[IO.Compression.CompressionLevel]::Optimal,$false)
+    $MrZip = [IO.Compression.ZipFile]::OpenRead($MrPack)
+    try {
+        $IndexEntry = $MrZip.GetEntry('modrinth.index.json')
+        if ($null -eq $IndexEntry) { throw 'MRPACK 缺少 modrinth.index.json' }
+        $IndexReader = [IO.StreamReader]::new($IndexEntry.Open())
+        try { $ParsedIndex = $IndexReader.ReadToEnd() | ConvertFrom-Json } finally { $IndexReader.Dispose() }
+        if ($ParsedIndex.formatVersion -ne 1 -or $ParsedIndex.game -ne 'minecraft') { throw 'MRPACK index 格式无效' }
+        if (@($ParsedIndex.files).Count -ne $IndexFiles.Count) { throw 'MRPACK 模组索引数量与下载清单不一致' }
+        if ($ParsedIndex.dependencies.minecraft -ne $Game -or $ParsedIndex.dependencies.'fabric-loader' -ne $LoaderVersion) { throw 'MRPACK 版本依赖错误' }
+        if ($null -eq $MrZip.GetEntry('overrides/resourcepacks/AeonArk_Title_Logo/pack.mcmeta')) { throw 'MRPACK overrides 缺少标题资源包' }
+        Write-Host "[PASS] Modrinth MRPACK 验证通过：$(@($ParsedIndex.files).Count) 个远程模组引用" -ForegroundColor Green
+    } finally { $MrZip.Dispose() }
+    Remove-Item $MrStage -Recurse -Force
     Write-Host "构建完成：$PackZip" -ForegroundColor Green
     Write-Host "必需与自动依赖模组：$($IndexFiles.Count)；可选跳过：$($Warnings.Count)" -ForegroundColor Green
     Write-Host '将此 ZIP 直接拖入 PCL 导入；首次安装需要联网下载 Minecraft、Fabric 和运行库。建议 Java 25 x64，内存先设为 5GB。' -ForegroundColor Yellow
