@@ -27,12 +27,9 @@ function Get-Meta([string]$Project) {
 function Get-Version([string]$Project,[string[]]$Platforms) {
     $Games = [uri]::EscapeDataString('["' + $Game + '"]')
     $Loaders = [uri]::EscapeDataString('["' + ($Platforms -join '","') + '"]')
-    $RawVersions = Invoke-RestMethod "$Api/project/$Project/version?game_versions=$Games&loaders=$Loaders" -TimeoutSec 45
-    if ($RawVersions -and $RawVersions.versions) { $Versions = @($RawVersions.versions) } else { $Versions = @($RawVersions) }
+    $Versions = @(Invoke-RestMethod "$Api/project/$Project/version?game_versions=$Games&loaders=$Loaders" -TimeoutSec 45)
     if ($Versions.Count -eq 0) { return $null }
-    $SortedVersions = @($Versions | Sort-Object @{Expression={switch ($_.version_type) {'release'{0} 'beta'{1} 'alpha'{2} default{3}}}},@{Expression={$_.date_published};Descending=$true})
-    if ($SortedVersions.Count -eq 0) { return $null }
-    return $SortedVersions[0]
+    return ($Versions | Sort-Object @{Expression={switch ($_.version_type) {'release'{0} 'beta'{1} 'alpha'{2} default{3}}}},@{Expression={$_.date_published};Descending=$true} | Select-Object -First 1)
 }
 function Get-File($Version,[string]$Extension) {
     $File = $Version.files | Where-Object { $_.primary -eq $true -and $_.filename.ToLower().EndsWith($Extension) } | Select-Object -First 1
